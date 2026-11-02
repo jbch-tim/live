@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>실시간 통역</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>">
+<style>
+  :root{
+    --bg:#f3f1ec; --card:#fffdf8; --ink:#1d2733; --muted:#6b7280; --line:#e4ded2;
+    --accent:#1e4d8c; --red:#c0392b; --green:#1f7a4d; --gold:#9a6b12; --fs:18px;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none !important}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--ink);font-size:var(--fs);line-height:1.6;
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR","Segoe UI","Microsoft YaHei","PingFang SC",sans-serif}
+  header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    padding:10px 16px;background:var(--accent);color:#fff}
+  header h1{margin:0;font-size:1.15em;margin-right:auto;letter-spacing:-.01em}
+  header button{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.35)}
+  main{max-width:1000px;margin:0 auto;padding:14px 14px 60px}
+  button,select,input{font:inherit;color:inherit}
+  button{padding:8px 14px;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:.9em}
+  button:hover{filter:brightness(.97)}
+  button:disabled{opacity:.45;cursor:default}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  select,input[type=text],input[type=password],input[type=number]{padding:7px 10px;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:.92em}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:14px}
+  .row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+  .lbl{color:var(--muted);font-size:.85em;min-width:6.5em}
+  .chk{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border:1px solid var(--line);border-radius:999px;background:#fff;cursor:pointer;user-select:none;font-size:.92em}
+  .chk input{width:17px;height:17px;accent-color:var(--accent);margin:0}
+  .chk.off{opacity:.35;pointer-events:none}
+  .chk.on{border-color:var(--accent);background:#eef4fb}
+  /* 스위치 */
+  .switch{display:inline-flex;align-items:center;gap:10px;cursor:pointer;user-select:none;font-weight:600}
+  .switch input{display:none}
+  .switch .track{width:46px;height:26px;border-radius:99px;background:#cfc8bb;position:relative;transition:.2s;flex:none}
+  .switch .track::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+  .switch input:checked + .track{background:#d97706}
+  .switch input:checked + .track::after{left:23px}
+  .cost{font-size:.85em;color:var(--gold)}
+  /* 큰 시작 버튼 */
+  .bigbtn{font-size:1.1em;padding:12px 26px;border-radius:14px;font-weight:700;border:none;color:#fff;background:var(--red)}
+  .bigbtn.on{background:#374151}
+  .live-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#9ca3af;margin-right:6px;vertical-align:middle}
+  .live-dot.on{background:var(--red);animation:blink 1.2s infinite}
+  @keyframes blink{50%{opacity:.25}}
+  .status{font-size:.85em;color:var(--muted)}
+  .status b{color:var(--ink);font-weight:600}
+  .status .err{color:var(--red)}
+  .pill{display:inline-block;padding:1px 8px;border-radius:99px;background:#ece7dc;font-size:.8em;margin-left:4px;color:var(--muted)}
+  .pill.ok{background:#dcefe4;color:var(--green)}
+  .pill.warn{background:#fbe3df;color:var(--red)}
+  /* 기록 */
+  .viewbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+  .seg button{border:none;border-radius:0;padding:7px 12px}
+  .seg button.on{background:var(--accent);color:#fff}
+  #log{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:6px 16px;min-height:220px;max-height:62vh;overflow:auto;scroll-behavior:smooth}
+  .ent{padding:10px 0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:auto 1fr;gap:2px 12px}
+  .ent:last-child{border-bottom:none}
+  .ent .tm{color:var(--muted);font-size:.75em;font-variant-numeric:tabular-nums;padding-top:.3em;white-space:nowrap}
+  .ent .body{min-width:0}
+  .ent .o{font-size:1em}
+  .ent .t{margin-top:4px;font-size:1em;display:flex;gap:8px}
+  .ent .t .lg{flex:none;font-size:.68em;font-weight:700;color:#fff;background:var(--accent);border-radius:6px;padding:1px 6px;height:1.7em;margin-top:.25em;line-height:1.5em}
+  .ent .t.cl .lg{background:#d97706}
+  .ent .t .tx{flex:1;min-width:0}
+  .ent .t.wait .tx{color:var(--muted);font-style:italic}
+  .ent .t.fail .tx{color:var(--red)}
+  .ent .t.fail button{padding:1px 8px;font-size:.75em;margin-left:6px}
+  body.v-tr .ent .o{display:none}
+  body.v-or .ent .t{display:none}
+  .interim{color:var(--muted);font-style:italic;padding:10px 0 10px calc(4.8em);min-height:1.2em}
+  .empty{color:var(--muted);text-align:center;padding:50px 10px}
+  .jump{position:fixed;right:20px;bottom:20px;z-index:15;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+  /* 자막(크게) 보기 */
+  #stage{position:fixed;inset:0;z-index:50;background:#0d1117;color:#f5f5f5;display:flex;flex-direction:column;padding:20px 4vw}
+  #stage .top{display:flex;gap:10px;align-items:center;color:#9ca3af;font-size:15px}
+  #stage .top select,#stage .top button{background:#1f2937;color:#e5e7eb;border-color:#374151;font-size:15px}
+  #stage .lines{flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:2.2vh;overflow:hidden}
+  #stage .ln{font-size:calc(var(--stage, 4.2) * 1vw);line-height:1.35;font-weight:600}
+  #stage .ln.old{opacity:.45;font-size:calc(var(--stage, 4.2) * .8vw)}
+  #stage .src{font-size:calc(var(--stage, 4.2) * .45vw);color:#9ca3af;font-weight:400;margin-top:.3em}
+  #stage .intr{font-size:calc(var(--stage, 4.2) * .5vw);color:#6b7280;min-height:1.4em;font-style:italic}
+  /* 패널 */
+  .panel h2{margin:0 0 8px;font-size:1em}
+  .panel p{margin:6px 0}
+  .hint{font-size:.82em;color:var(--muted)}
+  .tools{display:flex;flex-wrap:wrap;gap:8px}
+  #sessions{list-style:none;margin:8px 0 0;padding:0}
+  #sessions li{display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:.9em}
+  #sessions li span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #sessions li button{padding:3px 10px;font-size:.82em}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#111827;color:#fff;padding:9px 18px;border-radius:12px;font-size:.9em;z-index:60;opacity:0;transition:opacity .25s;pointer-events:none;max-width:90vw;text-align:center}
+  .toast.show{opacity:1}
+  .warnbox{background:#fff4e5;border:1px solid #f5d0a0;border-radius:12px;padding:10px 14px;font-size:.88em;margin-bottom:14px}
+  @media (max-width:640px){ .lbl{min-width:0;width:100%} }
+</style>
+</head>
+<body class="v-both">
+<header>
+  <h1>🎙️ 실시간 통역</h1>
+  <button id="fsDown" title="글자 작게">가−</button>
+  <button id="fsUp" title="글자 크게">가+</button>
+  <button id="stageBtn" title="번역을 크게 띄우기">🖥️ 크게 보기</button>
+  <button id="setBtn">⚙️ 설정</button>
+</header>
+
+<main>
+  <div class="warnbox" id="noSR" hidden>이 브라우저에서는 음성 인식을 쓸 수 없습니다. <b>Chrome</b>에서 열어 주세요.</div>
+
+  <!-- 설정 -->
+  <section class="card panel" id="setPanel" hidden>
+    <h2>⚙️ 설정</h2>
+    <p class="row"><span class="lbl">Anthropic API 키</span>
+      <input type="password" id="apiKey" placeholder="sk-ant-…" style="flex:1;min-width:220px" autocomplete="off">
+      <button id="keySave" class="primary">저장</button>
+      <button id="keyTest">연결 확인</button>
+      <button id="keyDel">지우기</button>
+    </p>
+    <p class="hint">키는 이 컴퓨터의 이 Chrome 안에만 저장되고, 번역할 때 Anthropic에만 직접 보내집니다. 교회 공용 컴퓨터라면 다 쓴 뒤 "지우기"를 눌러 주세요.</p>
+    <p class="status" id="keyStatus"></p>
+    <p class="row"><span class="lbl">Claude 가격</span>
+      입력 $<input type="number" id="pIn" step="0.01" min="0" style="width:6em"> · 출력 $<input type="number" id="pOut" step="0.01" min="0" style="width:6em"> <span class="hint">(100만 토큰당, Haiku 5.5 기본값)</span>
+    </p>
+    <p class="row"><span class="lbl">누적 사용</span><span id="totalCost" class="cost"></span> <button id="totalReset">0으로</button></p>
+    <p class="row"><span class="lbl">통·번역기 주소</span><input type="text" id="trUrl" style="flex:1;min-width:220px"></p>
+    <h2 style="margin-top:14px">🗂️ 지난 기록</h2>
+    <p class="hint">"새로 시작"을 누르면 지금 기록이 여기에 보관됩니다 (최근 30개). 이 컴퓨터에만 저장됩니다.</p>
+    <ul id="sessions"></ul>
+    <p style="text-align:right;margin-top:10px"><button id="setClose">닫기</button></p>
+  </section>
+
+  <!-- 조절 -->
+  <section class="card">
+    <div class="row" style="margin-bottom:10px">
+      <span class="lbl">말하는 언어</span>
+      <select id="srcLang">
+        <option value="ko-KR">한국어</option>
+        <option value="en-US">English (영어)</option>
+        <option value="fr-CA">Français – Canada (프랑스어 퀘벡)</option>
+        <option value="fr-FR">Français – France (프랑스어 프랑스)</option>
+        <option value="cmn-Hans-CN">中文 (중국어)</option>
+        <option value="es-ES">Español (스페인어)</option>
+      </select>
+    </div>
+    <div class="row" style="margin-bottom:10px">
+      <span class="lbl">번역할 언어</span>
+      <span id="targets" class="row" style="gap:8px"></span>
+    </div>
+    <div class="row" style="margin-bottom:12px">
+      <span class="lbl">번역 방식</span>
+      <label class="switch"><input type="checkbox" id="claudeOn"><span class="track"></span><span>Claude 실시간 번역</span></label>
+      <span id="engineNote" class="hint"></span>
+    </div>
+    <div class="row">
+      <button id="startBtn" class="bigbtn">● 듣기 시작</button>
+      <div class="status" id="status" style="flex:1;min-width:240px"></div>
+    </div>
+  </section>
+
+  <!-- 기록 -->
+  <div class="viewbar">
+    <div class="seg" id="viewSeg">
+      <button data-v="both" class="on">원문+번역</button>
+      <button data-v="tr">번역만</button>
+      <button data-v="or">원문만</button>
+    </div>
+    <span id="countInfo" class="hint" style="margin-left:auto"></span>
+  </div>
+  <div id="log"><div class="empty" id="emptyMsg">"듣기 시작"을 누르고 말씀을 시작하면 여기에 받아 적고 번역합니다.</div><div class="interim" id="interim"></div></div>
+
+  <!-- 끝난 뒤 -->
+  <section class="card" style="margin-top:14px">
+    <div class="row" style="margin-bottom:10px">
+      <span class="lbl">복사·받기</span>
+      <label class="chk"><input type="checkbox" id="withTime" checked> 시각 넣기</label>
+      <select id="exLang"></select>
+    </div>
+    <div class="tools">
+      <button id="cpOrig">📋 원문 복사</button>
+      <button id="cpTr">📋 번역 복사</button>
+      <button id="cpBoth">📋 원문+번역 복사</button>
+      <button id="dlTxt">⬇️ 텍스트 파일</button>
+      <button id="dlDocx">⬇️ Word 파일</button>
+      <button id="sendTr" class="primary">↗ 통·번역기로 보내기</button>
+      <button id="fillBtn">↻ 빠진 번역 채우기</button>
+      <button id="newBtn" style="margin-left:auto">🆕 새로 시작</button>
+    </div>
+    <p class="hint" style="margin-bottom:0">"통·번역기로 보내기"는 원문을 복사한 뒤 통·번역기를 새 탭으로 엽니다. 거기서 <b>파일·붙여넣기</b> 칸에 붙여넣기(맥 ⌘V, 윈도우 Ctrl+V) 하시면 됩니다.</p>
+  </section>
+</main>
+
+<button class="jump" id="jumpBtn" hidden>⬇ 맨 아래로</button>
+
+<!-- 크게 보기 -->
+<div id="stage" hidden>
+  <div class="top">
+    <select id="stageLang"></select>
+    <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="stageSrc" checked> 원문도 작게</label>
+    <button id="stDown">가−</button><button id="stUp">가+</button>
+    <span id="stageStatus" style="margin-left:auto"></span>
+    <button id="stageClose">✕ 닫기 (Esc)</button>
+  </div>
+  <div class="lines" id="stageLines"></div>
+  <div class="intr" id="stageInterim"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const LANGS = [
+  {code:'ko', name:'한국어',   tag:'KO', en:'Korean',  bible:'개역한글 (Korean Revised Version, 1961)'},
+  {code:'en', name:'English',  tag:'EN', en:'English', bible:'New King James Version (NKJV)'},
+  {code:'fr', name:'Français', tag:'FR', en:'French',  bible:'Louis Segond (1910)'},
+  {code:'zh', name:'中文',     tag:'中', en:'Simplified Chinese', bible:'和合本 (Chinese Union Version, simplified)', g:'zh-CN'},
+  {code:'es', name:'Español',  tag:'ES', en:'Spanish', bible:'Reina-Valera 1960'},
+];
+const L = c => LANGS.find(l => l.code === c);
+const srcCode = v => v.startsWith('cmn') ? 'zh' : v.slice(0, 2);
+const DEFAULT_TR_URL = 'https://claude.ai/artifact/LBF6fPQedUfGs53v9RNXGe';
+const MODEL = 'claude-haiku-5-5';
+
+/* ---------- 저장소 ---------- */
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } },
+  del(k){ try{ localStorage.removeItem(k); }catch(e){} }
+};
+const S = {
+  src: store.get('lv-src', 'ko-KR'),
+  targets: store.get('lv-targets', ['en', 'fr']),
+  claude: store.get('lv-claude', false),
+  key: store.get('lv-key', ''),
+  pIn: store.get('lv-pIn', 0.10),
+  pOut: store.get('lv-pOut', 0.50),
+  total: store.get('lv-total', {in:0, out:0, usd:0}),
+  fs: store.get('lv-fs', 18),
+  stage: store.get('lv-stage', 4.2),
+  view: store.get('lv-view', 'both'),
+  trUrl: store.get('lv-trUrl', DEFAULT_TR_URL),
+};
+const newSession = () => ({id: Date.now(), start: Date.now(), entries: [], usage: {in:0, out:0, usd:0, n:0}, src: S.src});
+let ses = store.get('lv-cur', null) || newSession();
+
+let saveTimer = null;
+function saveSoon(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNow, 600);
+}
+function saveNow(){
+  clearTimeout(saveTimer);
+  if (store.set('lv-cur', ses)){ lastSaved = Date.now(); return; }
+  // 저장 공간이 모자라면 오래된 기록부터 지움
+  const list = store.get('lv-sessions', []);
+  while (list.length){ list.shift(); store.set('lv-sessions', list); if (store.set('lv-cur', ses)){ lastSaved = Date.now(); toast('저장 공간이 모자라 가장 오래된 지난 기록을 지웠습니다.'); return; } }
+  saveFail = true;
+}
+let lastSaved = 0, saveFail = false;
+
+/* ---------- 도우미 ---------- */
+const pad = n => String(n).padStart(2, '0');
+const hms = t => { const d = new Date(t); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+const dur = ms => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 3600)}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`; };
+const usd = v => v < 0.01 ? `$${v.toFixed(4)}` : `$${v.toFixed(3)}`;
+let toastT;
+function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+async function copyText(text, what){
+  if (!text.trim()){ toast('복사할 내용이 없습니다.'); return false; }
+  try{ await navigator.clipboard.writeText(text); toast(`${what} 복사했습니다.`); return true; }
+  catch(e){
+    const ta = document.createElement('textarea'); ta.value = text; document.body.append(ta); ta.select();
+    let ok = false; try{ ok = document.execCommand('copy'); }catch(_){}
+    ta.remove(); toast(ok ? `${what} 복사했습니다.` : '복사하지 못했습니다.'); return ok;
+  }
+}
+
+/* ---------- 언어 선택 화면 ---------- */
+function renderTargets(){
+  const sc = srcCode(S.src);
+  $('targets').innerHTML = '';
+  LANGS.forEach(l => {
+    const lab = document.createElement('label');
+    const same = l.code === sc;
+    const on = S.targets.includes(l.code) && !same;
+    lab.className = 'chk' + (same ? ' off' : '') + (on ? ' on' : '');
+    lab.innerHTML = `<input type="checkbox" ${on ? 'checked' : ''} ${same ? 'disabled' : ''}> ${l.name}`;
+    lab.querySelector('input').onchange = e => {
+      S.targets = e.target.checked ? [...new Set([...S.targets, l.code])] : S.targets.filter(c => c !== l.code);
+      S.targets = LANGS.map(x => x.code).filter(c => S.targets.includes(c));
+      store.set('lv-targets', S.targets); renderTargets(); renderExLang();
+    };
+    $('targets').append(lab);
+  });
+}
+const activeTargets = () => S.targets.filter(c => c !== srcCode(S.src));
+
+function renderExLang(){
+  const langs = new Set(activeTargets());
+  ses.entries.forEach(e => Object.keys(e.tr || {}).forEach(c => langs.add(c)));
+  const cur = $('exLang').value || $('stageLang').value;
+  [$('exLang'), $('stageLang')].forEach(sel => {
+    const keep = sel.value;
+    sel.innerHTML = '';
+    LANGS.filter(l => langs.has(l.code)).forEach(l => sel.add(new Option(`번역: ${l.name}`, l.code)));
+    if ([...sel.options].some(o => o.value === (keep || cur))) sel.value = keep || cur;
+  });
+}
+
+function renderEngine(){
+  $('claudeOn').checked = S.claude;
+  if (S.claude){
+    const u = ses.usage;
+    $('engineNote').innerHTML = S.key
+      ? `<span class="cost">Claude Haiku 5.5 · 이번 기록 ${u.n}문장 ${usd(u.usd)}</span> <span class="hint">(1시간에 대략 10센트 안팎)</span>`
+      : `<span style="color:var(--red)">API 키가 없습니다. ⚙️ 설정에서 넣어 주세요. (그동안은 Google 번역으로 합니다)</span>`;
+  } else {
+    $('engineNote').textContent = '지금은 무료 Google 번역';
+  }
+}
+
+/* ---------- 기록 표시 ---------- */
+function entryEl(e, i){
+  const d = document.createElement('div'); d.className = 'ent'; d.dataset.i = i;
+  const tm = document.createElement('div'); tm.className = 'tm'; tm.textContent = hms(e.t);
+  const b = document.createElement('div'); b.className = 'body';
+  const o = document.createElement('div'); o.className = 'o'; o.textContent = e.text;
+  b.append(o);
+  const langs = LANGS.map(l => l.code).filter(c => c in (e.tr || {}) || (e.pend || []).includes(c) || (e.fail || []).includes(c));
+  langs.forEach(c => {
+    const t = document.createElement('div');
+    const tx = document.createElement('span'); tx.className = 'tx';
+    const lg = document.createElement('span'); lg.className = 'lg'; lg.textContent = L(c).tag;
+    if (e.tr && e.tr[c] != null){
+      t.className = 't' + (e.eng === 'claude' ? ' cl' : '');
+      tx.textContent = e.tr[c];
+    } else if ((e.fail || []).includes(c)){
+      t.className = 't fail'; tx.textContent = '번역하지 못했습니다';
+      const rb = document.createElement('button'); rb.textContent = '다시'; rb.onclick = () => retry(i); tx.append(rb);
+    } else { t.className = 't wait'; tx.textContent = '번역 중…'; }
+    t.append(lg, tx); b.append(t);
+  });
+  d.append(tm, b);
+  return d;
+}
+function nearBottom(){ const g = $('log'); return g.scrollHeight - g.scrollTop - g.clientHeight < 80; }
+function scrollEnd(){ const g = $('log'); g.scrollTop = g.scrollHeight; }
+function renderAll(){
+  const g = $('log');
+  [...g.querySelectorAll('.ent')].forEach(n => n.remove());
+  const frag = document.createDocumentFragment();
+  ses.entries.forEach((e, i) => frag.append(entryEl(e, i)));
+  g.insertBefore(frag, $('interim'));
+  $('emptyMsg').hidden = ses.entries.length > 0;
+  scrollEnd(); renderCount(); renderStage(); renderExLang();
+}
+function updateEntry(i){
+  const stick = nearBottom();
+  const old = $('log').querySelector(`.ent[data-i="${i}"]`);
+  const n = entryEl(ses.entries[i], i);
+  if (old) old.replaceWith(n); else $('log').insertBefore(n, $('interim'));
+  $('emptyMsg').hidden = true;
+  if (stick) scrollEnd(); else $('jumpBtn').hidden = false;
+  renderCount(); renderStage();
+}
+function renderCount(){
+  const n = ses.entries.length;
+  if (!n){ $('countInfo').textContent = ''; return; }
+  const words = ses.entries.reduce((a, e) => a + e.text.length, 0);
+  $('countInfo').textContent = `${new Date(ses.start).toLocaleDateString('ko-KR')} ${hms(ses.start)} 시작 · ${n}문장 · ${words.toLocaleString()}자`;
+}
+$('log').addEventListener('scroll', () => { if (nearBottom()) $('jumpBtn').hidden = true; });
+$('jumpBtn').onclick = () => { scrollEnd(); $('jumpBtn').hidden = true; };
+
+/* ---------- 음성 인식 ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, want = false, recActive = false, interimText = '', lastEvent = 0, restarts = 0, lastErr = '';
+let runStart = 0, runAccum = store.get('lv-runAccum-' + ses.id, 0), lastStartTry = 0, netBackoff = 0;
+
+function makeRec(){
+  const r = new SR();
+  r.lang = S.src; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
+  r.onstart = () => { recActive = true; lastEvent = Date.now(); lastErr = ''; renderStatus(); };
+  r.onresult = ev => {
+    lastEvent = Date.now(); netBackoff = 0;
+    let interim = '';
+    for (let k = ev.resultIndex; k < ev.results.length; k++){
+      const res = ev.results[k];
+      const txt = res[0].transcript;
+      if (res.isFinal) addEntry(txt);
+      else interim += txt;
+    }
+    interimText = interim.trim();
+    showInterim();
+  };
+  r.onerror = ev => {
+    lastErr = ev.error;
+    if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed'){
+      want = false; toast('마이크 사용이 허락되지 않았습니다. 주소창 왼쪽 자물쇠 → 마이크 "허용"으로 바꿔 주세요.');
+    } else if (ev.error === 'audio-capture'){
+      want = false; toast('마이크를 찾지 못했습니다. 마이크 연결을 확인해 주세요.');
+    } else if (ev.error === 'network'){
+      netBackoff = Math.min(8000, (netBackoff || 500) * 2);
+    }
+    renderStatus();
+  };
+  r.onend = () => {
+    recActive = false;
+    if (interimText){ addEntry(interimText); interimText = ''; showInterim(); } // 끊길 때 받아 적던 말 살리기
+    if (want){
+      setTimeout(() => { if (want && !recActive) startRec(true); }, netBackoff || 150);
+    } else stopUI();
+    renderStatus();
+  };
+  return r;
+}
+function startRec(isRestart){
+  lastStartTry = Date.now();
+  try{
+    if (rec){ rec.onend = rec.onresult = rec.onerror = rec.onstart = null; try{ rec.abort(); }catch(e){} }
+    rec = makeRec(); rec.start();
+    if (isRestart) restarts++;
+  }catch(e){ /* 이미 시작됐거나 잠시 뒤 다시 */ }
+}
+// 감시: 조용히 멈춰 버린 경우 다시 켜기
+setInterval(() => {
+  if (!want) return;
+  const now = Date.now();
+  if (!recActive && now - lastStartTry > 3000) startRec(true);
+  else if (recActive && now - lastEvent > 45000 && !interimText){ try{ rec.stop(); }catch(e){} lastEvent = now; } // 오래 아무 소식이 없으면 새로 고침
+  renderStatus();
+}, 2000);
+
+function addEntry(raw){
+  const text = raw.replace(/\s+/g, ' ').trim();
+  if (!text) return;
+  const e = {t: Date.now(), text, tr: {}, pend: activeTargets(), fail: []};
+  ses.entries.push(e);
+  const i = ses.entries.length - 1;
+  updateEntry(i); renderExLang(); saveSoon();
+  enqueue(i);
+}
+function showInterim(){
+  $('interim').textContent = interimText ? '… ' + interimText : '';
+  $('stageInterim').textContent = interimText;
+  if (interimText && nearBottom()) scrollEnd();
+}
+
+/* 화면 꺼짐 방지 */
+let wake = null;
+async function lockScreen(){
+  if (!('wakeLock' in navigator)) return;
+  try{ wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; renderStatus(); }); }
+  catch(e){ wake = null; }
+  renderStatus();
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && want && !wake) lockScreen();
+  if (document.visibilityState === 'hidden') saveNow();
+});
+
+function startListening(){
+  if (!SR){ toast('Chrome에서 열어 주세요.'); return; }
+  want = true; restarts = 0; runStart = Date.now();
+  if (!ses.entries.length){ ses.start = Date.now(); ses.src = S.src; }
+  startRec(false); lockScreen();
+  $('startBtn').textContent = '■ 듣기 멈춤'; $('startBtn').classList.add('on');
+  $('srcLang').disabled = true;
+  renderStatus();
+}
+function stopListening(){
+  want = false;
+  try{ rec && rec.stop(); }catch(e){}
+  stopUI();
+}
+function stopUI(){
+  if (runStart){ runAccum += Date.now() - runStart; runStart = 0; store.set('lv-runAccum-' + ses.id, runAccum); }
+  if (wake){ wake.release().catch(() => {}); wake = null; }
+  $('startBtn').textContent = '● 듣기 시작'; $('startBtn').classList.remove('on');
+  $('srcLang').disabled = false;
+  saveNow(); renderStatus();
+}
+$('startBtn').onclick = () => want ? stopListening() : startListening();
+
+function renderStatus(){
+  const listened = runAccum + (runStart ? Date.now() - runStart : 0);
+  const bits = [];
+  if (want){
+    bits.push(`<span class="live-dot on"></span><b>${recActive ? '듣는 중' : '다시 연결 중…'}</b> ${dur(listened)}`);
+    bits.push(wake ? '<span class="pill ok">화면 꺼짐 방지</span>' : '<span class="pill warn">화면 꺼짐 방지 안 됨</span>');
+    if (restarts) bits.push(`<span class="pill">자동 재시작 ${restarts}회</span>`);
+    if (lastErr === 'network') bits.push('<span class="err">인터넷 연결 확인 중</span>');
+  } else {
+    bits.push(`<span class="live-dot"></span>멈춤${listened ? ' · 들은 시간 ' + dur(listened) : ''}`);
+  }
+  if (saveFail) bits.push('<span class="pill warn">저장 실패</span>');
+  else if (lastSaved) bits.push(`<span class="pill ok">자동 저장 ${hms(lastSaved)}</span>`);
+  if (queue.length + busy > 0) bits.push(`<span class="pill">번역 대기 ${queue.length + busy}</span>`);
+  $('status').innerHTML = bits.join(' ');
+  $('stageStatus').textContent = want ? (recActive ? '● 듣는 중' : '다시 연결 중…') : '멈춤';
+}
+
+/* ---------- 번역 ---------- */
+const queue = []; let busy = 0;
+function enqueue(i){ queue.push(i); pump(); }
+function pump(){
+  while (busy < 2 && queue.length){
+    const i = queue.shift(); busy++;
+    translateEntry(i).catch(console.error).finally(() => { busy--; renderStatus(); pump(); });
+  }
+  renderStatus();
+}
+async function translateEntry(i){
+  const e = ses.entries[i];
+  const langs = [...(e.pend || [])];
+  if (!langs.length) return;
+  const sc = srcCode(ses.src || S.src);
+  let done = false;
+  if (S.claude && S.key){
+    try{
+      const out = await claudeTranslate(i, sc, langs);
+      langs.forEach(c => { if (typeof out[c] === 'string' && out[c].trim()) e.tr[c] = out[c].trim(); });
+      e.eng = 'claude';
+      done = langs.every(c => e.tr[c] != null);
+    }catch(err){
+      console.warn('Claude 번역 실패, Google로 대신합니다', err);
+      if (err.user) toast(err.user);
+    }
+  }
+  if (!done){
+    const left = langs.filter(c => e.tr[c] == null);
+    await Promise.all(left.map(async c => {
+      try{ e.tr[c] = await googleTranslate(e.text, sc, c); }
+      catch(err){ e.fail = [...new Set([...(e.fail || []), c])]; }
+    }));
+    if (!e.eng) e.eng = 'google';
+    else if (e.eng === 'claude' && left.length) e.eng = 'mixed';
+  }
+  e.pend = langs.filter(c => e.tr[c] == null && !(e.fail || []).includes(c));
+  e.fail = (e.fail || []).filter(c => e.tr[c] == null);
+  updateEntry(i); saveSoon();
+}
+function retry(i){
+  const e = ses.entries[i];
+  e.pend = [...new Set([...(e.pend || []), ...(e.fail || [])])]; e.fail = [];
+  updateEntry(i); enqueue(i);
+}
+
+async function googleTranslate(text, sl, tl, tries = 2){
+  const g = c => (L(c) && L(c).g) || c;
+  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${g(sl)}&tl=${g(tl)}&dt=t&q=${encodeURIComponent(text)}`;
+  for (let k = 0; k < tries; k++){
+    try{
+      const r = await fetch(url);
+      if (!r.ok) throw new Error('google ' + r.status);
+      const j = await r.json();
+      return j[0].map(x => x[0]).join('').trim();
+    }catch(err){ if (k === tries - 1) throw err; await new Promise(r => setTimeout(r, 1200)); }
+  }
+}
+
+let noThinkingParam = store.get('lv-noThink', false);
+function systemPrompt(sc, langs){
+  return `You are a live interpreter at a Korean-Canadian church in Montreal. You receive one short segment of a long spoken talk (a testimony, sermon or Bible lecture) as captured by speech recognition, in ${L(sc).en}.
+Translate the segment into: ${langs.map(c => L(c).en).join(', ')}.
+Rules:
+- Speech recognition makes mistakes and has no punctuation. Silently fix obvious mis-hearings using context (especially Bible names, books, places and church words) and translate what the speaker meant.
+- Faithful, natural spoken style that matches the speaker's tone. Do not add, explain, summarize or comment.
+- A segment may be an incomplete sentence; translate it as a natural fragment that continues the previous context.
+- When the speaker quotes or alludes to Scripture, use the wording of these Bible versions: ${langs.map(c => `${L(c).en}: ${L(c).bible}`).join('; ')}. Use standard Protestant names for Bible books and people in each language.
+- Keep God/Jesus terms reverent and consistent (e.g. Korean 하나님, 예수님).
+Return ONLY a JSON object with exactly these keys: ${langs.map(c => `"${c}"`).join(', ')}. Each value is the translation string. No other text.`;
+}
+async function claudeTranslate(i, sc, langs){
+  const e = ses.entries[i];
+  const prev = ses.entries.slice(Math.max(0, i - 4), i).map(x => x.text).join('\n');
+  const user = (prev ? `Earlier context (do NOT translate, for reference only):\n${prev}\n\n` : '') + `Segment to translate:\n${e.text}`;
+  const body = {model: MODEL, max_tokens: 1500, system: systemPrompt(sc, langs), messages: [{role: 'user', content: user}]};
+  if (!noThinkingParam) body.thinking = {type: 'disabled'};
+  let r = await callClaude(body);
+  if (r.status === 400 && !noThinkingParam){
+    const msg = await r.clone().text();
+    if (/thinking/i.test(msg)){ noThinkingParam = true; store.set('lv-noThink', true); delete body.thinking; r = await callClaude(body); }
+  }
+  if (r.status === 429 || r.status === 529 || r.status >= 500){
+    await new Promise(z => setTimeout(z, 1500)); r = await callClaude(body);
+  }
+  if (!r.ok){
+    const err = new Error('claude ' + r.status);
+    if (r.status === 401) err.user = 'API 키가 맞지 않습니다. ⚙️ 설정에서 확인해 주세요. (Google 번역으로 대신했습니다)';
+    else if (r.status === 403 || r.status === 402) err.user = 'Anthropic 계정의 사용 한도나 결제를 확인해 주세요. (Google 번역으로 대신했습니다)';
+    else if (r.status === 429) err.user = 'Claude 요청이 많아 잠시 Google 번역으로 대신합니다.';
+    throw err;
+  }
+  const j = await r.json();
+  const u = j.usage || {};
+  const tin = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0);
+  const tout = u.output_tokens || 0;
+  const cost = tin * S.pIn / 1e6 + tout * S.pOut / 1e6;
+  ses.usage.in += tin; ses.usage.out += tout; ses.usage.usd += cost; ses.usage.n++;
+  S.total.in += tin; S.total.out += tout; S.total.usd += cost; store.set('lv-total', S.total);
+  renderEngine(); renderTotal();
+  if (j.stop_reason === 'refusal') throw new Error('refusal');
+  const txt = (j.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
+  const s = txt.indexOf('{'), en = txt.lastIndexOf('}');
+  if (s < 0 || en < s) throw new Error('json');
+  return JSON.parse(txt.slice(s, en + 1));
+}
+function callClaude(body){
+  return fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': S.key,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify(body)
+  });
+}
+
+$('fillBtn').onclick = () => {
+  const want = activeTargets(); let n = 0;
+  ses.entries.forEach((e, i) => {
+    const miss = want.filter(c => e.tr[c] == null);
+    if (miss.length && !(e.pend || []).length){ e.pend = miss; e.fail = []; updateEntry(i); enqueue(i); n++; }
+  });
+  toast(n ? `${n}문장의 빠진 번역을 채우고 있습니다.` : '빠진 번역이 없습니다.');
+};
+
+/* ---------- 크게 보기 ---------- */
+function renderStage(){
+  if ($('stage').hidden) return;
+  const c = $('stageLang').value;
+  const box = $('stageLines'); box.innerHTML = '';
+  ses.entries.slice(-3).forEach((e, k, arr) => {
+    const d = document.createElement('div'); d.className = 'ln' + (k < arr.length - 1 ? ' old' : '');
+    d.textContent = c && e.tr[c] != null ? e.tr[c] : ((e.pend || []).includes(c) ? '…' : e.text);
+    if ($('stageSrc').checked && c){ const s = document.createElement('div'); s.className = 'src'; s.textContent = e.text; d.append(s); }
+    box.append(d);
+  });
+  $('stage').style.setProperty('--stage', S.stage);
+}
+$('stageBtn').onclick = () => {
+  renderExLang(); $('stage').hidden = false; renderStage(); renderStatus();
+  if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+};
+function closeStage(){ $('stage').hidden = true; if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); }
+$('stageClose').onclick = closeStage;
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('stage').hidden) closeStage(); });
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && !$('stage').hidden) {/* 전체화면만 풀림 */} });
+$('stageLang').onchange = renderStage; $('stageSrc').onchange = renderStage;
+$('stUp').onclick = () => { S.stage = Math.min(9, +(S.stage + .4).toFixed(1)); store.set('lv-stage', S.stage); renderStage(); };
+$('stDown').onclick = () => { S.stage = Math.max(2, +(S.stage - .4).toFixed(1)); store.set('lv-stage', S.stage); renderStage(); };
+
+/* ---------- 복사·파일 ---------- */
+function lines(kind){
+  const tm = $('withTime').checked, c = $('exLang').value;
+  return ses.entries.map(e => {
+    const p = tm ? `[${hms(e.t)}] ` : '';
+    const tr = c && e.tr[c] != null ? e.tr[c] : '';
+    if (kind === 'orig') return p + e.text;
+    if (kind === 'tr') return tr ? p + tr : '';
+    return p + e.text + (tr ? '\n' + (tm ? ' '.repeat(p.length) : '') + tr : '');
+  }).filter(Boolean).join(kind === 'both' ? '\n\n' : '\n');
+}
+const langName = () => { const c = $('exLang').value; return c ? L(c).name : ''; };
+$('cpOrig').onclick = () => copyText(lines('orig'), '원문을');
+$('cpTr').onclick = () => $('exLang').value ? copyText(lines('tr'), `${langName()} 번역을`) : toast('번역이 없습니다.');
+$('cpBoth').onclick = () => copyText(lines('both'), '원문과 번역을');
+
+function fileBase(){
+  const d = new Date(ses.start);
+  return `live-interpretation_${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
+}
+function download(name, blob){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast('파일을 받았습니다. (다운로드 폴더)');
+}
+function header(){
+  const d = new Date(ses.start);
+  const tr = activeTargets().concat(...ses.entries.map(e => Object.keys(e.tr))).filter((v, i, a) => a.indexOf(v) === i);
+  return `실시간 통역 기록 — ${d.toLocaleString('ko-KR')}\n원문: ${L(srcCode(ses.src || S.src)).name} · 번역: ${tr.map(c => L(c).name).join(', ')} · ${ses.entries.length}문장`;
+}
+$('dlTxt').onclick = () => {
+  if (!ses.entries.length) return toast('받을 내용이 없습니다.');
+  // 모든 번역 언어를 한 파일에
+  const tm = $('withTime').checked;
+  const langs = LANGS.map(l => l.code).filter(c => ses.entries.some(e => e.tr[c] != null));
+  const body = ses.entries.map(e => {
+    const p = tm ? `[${hms(e.t)}] ` : '';
+    return p + e.text + langs.filter(c => e.tr[c] != null).map(c => `\n  ${L(c).tag}: ${e.tr[c]}`).join('');
+  }).join('\n\n');
+  download(fileBase() + '.txt', new Blob(['﻿' + header() + '\n\n' + body + '\n'], {type: 'text/plain;charset=utf-8'}));
+};
+let docxLib = null;
+function loadDocx(){
+  if (window.docx) return Promise.resolve();
+  if (docxLib) return docxLib;
+  docxLib = new Promise((ok, no) => {
+    const s = document.createElement('script');
+    s.src = 'lib/docx.min.js';
+    s.onload = ok; s.onerror = () => { docxLib = null; no(new Error('docx')); };
+    document.head.append(s);
+  });
+  return docxLib;
+}
+$('dlDocx').onclick = async () => {
+  if (!ses.entries.length) return toast('받을 내용이 없습니다.');
+  toast('Word 파일을 만드는 중…');
+  try{ await loadDocx(); }catch(e){ toast('Word 도구를 불러오지 못했습니다. 텍스트 파일로 받아 주세요.'); return; }
+  const {Document, Packer, Paragraph, TextRun} = window.docx;
+  const tm = $('withTime').checked;
+  const langs = LANGS.map(l => l.code).filter(c => ses.entries.some(e => e.tr[c] != null));
+  const kids = header().split('\n').map((ln, k) => new Paragraph({spacing: {after: k ? 240 : 60}, children: [new TextRun({text: ln, bold: !k, size: k ? 20 : 28, color: k ? '666666' : undefined})]}));
+  ses.entries.forEach(e => {
+    kids.push(new Paragraph({spacing: {after: 40}, children: [
+      ...(tm ? [new TextRun({text: hms(e.t) + '  ', color: '999999', size: 18})] : []),
+      new TextRun({text: e.text})
+    ]}));
+    langs.filter(c => e.tr[c] != null).forEach((c, k, a) => kids.push(new Paragraph({indent: {left: 360}, spacing: {after: k === a.length - 1 ? 220 : 30}, children: [
+      new TextRun({text: L(c).tag + '  ', bold: true, color: '1E4D8C', size: 18}), new TextRun({text: e.tr[c], color: '333333'})
+    ]})));
+  });
+  const doc = new Document({styles: {default: {document: {run: {font: 'Malgun Gothic', size: 22}}}}, sections: [{children: kids}]});
+  download(fileBase() + '.docx', await Packer.toBlob(doc));
+};
+$('sendTr').onclick = () => {
+  const text = ses.entries.map(e => e.text).join('\n');
+  if (!text.trim()) return toast('보낼 원문이 없습니다.');
+  const w = window.open(S.trUrl || DEFAULT_TR_URL, '_blank');
+  copyText(text, '원문을').then(ok => { if (ok) toast('원문을 복사했습니다. 통·번역기의 "파일·붙여넣기" 칸에 붙여넣어 주세요.'); });
+  if (!w) toast('새 탭이 막혔습니다. 팝업 허용 후 다시 눌러 주세요.');
+};
+
+/* ---------- 새로 시작·지난 기록 ---------- */
+function archive(){
+  if (!ses.entries.length) return;
+  const list = store.get('lv-sessions', []).filter(x => x.id !== ses.id);
+  ses.listened = runAccum + (runStart ? Date.now() - runStart : 0);
+  list.push(ses); while (list.length > 30) list.shift();
+  while (!store.set('lv-sessions', list) && list.length > 1) list.shift();
+}
+$('newBtn').onclick = () => {
+  if (want) return toast('먼저 "듣기 멈춤"을 눌러 주세요.');
+  if (!ses.entries.length) return toast('이미 새 기록입니다.');
+  archive();
+  store.del('lv-runAccum-' + ses.id);
+  ses = newSession(); runAccum = 0; queue.length = 0; saveNow();
+  renderAll(); renderEngine(); renderSessions(); renderStatus();
+  toast('지금까지의 기록은 ⚙️ 설정 → 지난 기록에 보관했습니다.');
+};
+function renderSessions(){
+  const list = store.get('lv-sessions', []).slice().reverse();
+  const ul = $('sessions'); ul.innerHTML = '';
+  if (!list.length){ ul.innerHTML = '<li class="hint">아직 보관된 기록이 없습니다.</li>'; return; }
+  list.forEach(x => {
+    const li = document.createElement('li');
+    const sp = document.createElement('span');
+    sp.textContent = `${new Date(x.start).toLocaleString('ko-KR', {dateStyle: 'medium', timeStyle: 'short'})} · ${x.entries.length}문장 · ${(x.entries[0] || {}).text || ''}`;
+    const open = document.createElement('button'); open.textContent = '열기';
+    open.onclick = () => {
+      if (want) return toast('먼저 "듣기 멈춤"을 눌러 주세요.');
+      archive(); store.set('lv-runAccum-' + ses.id, runAccum);
+      ses = x; runAccum = x.listened || 0; S.src = x.src || S.src; $('srcLang').value = S.src;
+      store.set('lv-sessions', store.get('lv-sessions', []).filter(y => y.id !== x.id));
+      saveNow(); renderTargets(); renderAll(); renderEngine(); renderSessions(); renderStatus();
+      $('setPanel').hidden = true; toast('지난 기록을 열었습니다. 이어서 들을 수도 있습니다.');
+    };
+    const del = document.createElement('button'); del.textContent = '지우기';
+    del.onclick = () => {
+      if (del.dataset.sure !== '1'){ del.dataset.sure = '1'; del.textContent = '정말 지우기'; setTimeout(() => { del.dataset.sure = ''; del.textContent = '지우기'; }, 3000); return; }
+      store.set('lv-sessions', store.get('lv-sessions', []).filter(y => y.id !== x.id)); renderSessions();
+    };
+    li.append(sp, open, del); ul.append(li);
+  });
+}
+
+/* ---------- 설정 ---------- */
+function renderTotal(){ $('totalCost').textContent = `Claude ${S.total.in.toLocaleString()} 입력 + ${S.total.out.toLocaleString()} 출력 토큰 · 약 ${usd(S.total.usd)}`; }
+$('setBtn').onclick = () => { $('setPanel').hidden = !$('setPanel').hidden; if (!$('setPanel').hidden){ renderSessions(); $('setPanel').scrollIntoView({behavior: 'smooth'}); } };
+$('setClose').onclick = () => $('setPanel').hidden = true;
+$('keySave').onclick = () => {
+  const k = $('apiKey').value.trim();
+  if (!k) return toast('키를 넣어 주세요.');
+  S.key = k; store.set('lv-key', k); $('apiKey').value = ''; $('apiKey').placeholder = '저장됨 (' + k.slice(0, 10) + '…' + k.slice(-4) + ')';
+  renderEngine(); toast('API 키를 저장했습니다.');
+};
+$('keyDel').onclick = () => { S.key = ''; store.del('lv-key'); $('apiKey').placeholder = 'sk-ant-…'; renderEngine(); $('keyStatus').textContent = ''; toast('API 키를 지웠습니다.'); };
+$('keyTest').onclick = async () => {
+  const k = $('apiKey').value.trim() || S.key;
+  if (!k) return toast('키를 먼저 넣어 주세요.');
+  $('keyStatus').textContent = '확인 중…';
+  const old = S.key; S.key = k;
+  try{
+    const body = {model: MODEL, max_tokens: 200, messages: [{role: 'user', content: 'Reply with the single word OK.'}]};
+    if (!noThinkingParam) body.thinking = {type: 'disabled'};
+    let r = await callClaude(body);
+    if (r.status === 400 && !noThinkingParam && /thinking/i.test(await r.clone().text())){ noThinkingParam = true; store.set('lv-noThink', true); delete body.thinking; r = await callClaude(body); }
+    $('keyStatus').innerHTML = r.ok ? '<span style="color:var(--green)">✔ 연결됐습니다. Claude 실시간 번역을 쓸 수 있습니다.</span>'
+      : r.status === 401 ? '<span style="color:var(--red)">✘ 키가 맞지 않습니다.</span>'
+      : `<span style="color:var(--red)">✘ 문제가 있습니다 (코드 ${r.status}). 계정의 결제·한도를 확인해 주세요.</span>`;
+  }catch(e){ $('keyStatus').innerHTML = '<span style="color:var(--red)">✘ 연결하지 못했습니다. 인터넷을 확인해 주세요.</span>'; }
+  finally{ S.key = old; }
+};
+$('pIn').value = S.pIn; $('pOut').value = S.pOut;
+$('pIn').onchange = () => { S.pIn = Math.max(0, +$('pIn').value || 0); store.set('lv-pIn', S.pIn); };
+$('pOut').onchange = () => { S.pOut = Math.max(0, +$('pOut').value || 0); store.set('lv-pOut', S.pOut); };
+$('totalReset').onclick = () => { S.total = {in: 0, out: 0, usd: 0}; store.set('lv-total', S.total); renderTotal(); };
+$('trUrl').value = S.trUrl;
+$('trUrl').onchange = () => { S.trUrl = $('trUrl').value.trim() || DEFAULT_TR_URL; $('trUrl').value = S.trUrl; store.set('lv-trUrl', S.trUrl); };
+if (S.key) $('apiKey').placeholder = '저장됨 (' + S.key.slice(0, 10) + '…' + S.key.slice(-4) + ')';
+
+$('claudeOn').onchange = () => {
+  S.claude = $('claudeOn').checked; store.set('lv-claude', S.claude); renderEngine();
+  if (S.claude && !S.key){ $('setPanel').hidden = false; $('apiKey').focus(); }
+};
+$('srcLang').value = S.src;
+$('srcLang').onchange = () => {
+  S.src = $('srcLang').value; store.set('lv-src', S.src);
+  if (!ses.entries.length) ses.src = S.src;
+  renderTargets(); renderExLang();
+};
+$('viewSeg').onclick = e => {
+  const v = e.target.dataset && e.target.dataset.v; if (!v) return;
+  S.view = v; store.set('lv-view', v); applyView();
+};
+function applyView(){
+  document.body.classList.remove('v-both', 'v-tr', 'v-or'); document.body.classList.add('v-' + S.view);
+  [...$('viewSeg').children].forEach(b => b.classList.toggle('on', b.dataset.v === S.view));
+}
+function applyFs(){ document.documentElement.style.setProperty('--fs', S.fs + 'px'); store.set('lv-fs', S.fs); }
+$('fsUp').onclick = () => { S.fs = Math.min(34, S.fs + 2); applyFs(); };
+$('fsDown').onclick = () => { S.fs = Math.max(14, S.fs - 2); applyFs(); };
+
+window.addEventListener('beforeunload', e => { saveNow(); if (want){ e.preventDefault(); e.returnValue = ''; } });
+
+/* ---------- 시작 ---------- */
+if (!SR) $('noSR').hidden = false;
+applyFs(); applyView(); renderTargets(); renderEngine(); renderTotal(); renderAll(); renderStatus();
+// 닫히기 전에 번역되지 못한 문장 이어서 번역
+ses.entries.forEach((e, i) => { if ((e.pend || []).length) enqueue(i); });
+if (ses.entries.length) toast('지난번 기록을 이어서 보여 드립니다. 새로 하려면 "새로 시작"을 누르세요.');
+</script>
+</body>
+</html>
