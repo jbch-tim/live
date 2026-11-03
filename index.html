@@ -127,6 +127,19 @@
   .menu button{border:none;background:transparent;text-align:left;padding:9px 12px;border-radius:8px;display:flex;align-items:center;gap:8px;white-space:nowrap}
   .menu button:hover{background:#eef4fb;filter:none}
   .menu[hidden]{display:none !important}
+  .pchip{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;font-size:.95em}
+  .pchip .no{display:inline-grid;place-items:center;width:1.5em;height:1.5em;border-radius:50%;background:#e5e7eb;font-size:.78em;font-weight:700}
+  .pchip.on{border-color:var(--red);background:#fdf0ee;box-shadow:0 0 0 1px var(--red) inset;font-weight:700}
+  .pchip.on .no{background:var(--red);color:#fff}
+  .pchip.on::after{content:"● 듣는 중";font-size:.72em;color:var(--red);font-weight:600}
+  .pchip.on.paused::after{content:"멈춤";color:var(--muted)}
+  .pwrap{display:inline-flex;align-items:center;gap:0}
+  .pwrap .mini{border:none;background:transparent;color:#c0c4cc;padding:4px 3px;font-size:.78em}
+  .pwrap .mini:hover{color:var(--ink)}
+  .pwrap .mini.sure{color:#fff;background:var(--red);border-radius:6px}
+  .addchip{border-style:dashed;color:var(--accent);font-weight:600}
+  .addform{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;padding:10px;border:1px dashed #9db4d3;border-radius:12px;background:#f6f9fd}
+  .addform .fbtn{padding:4px 9px;font-size:.85em}
   .warnbox{background:#fff4e5;border:1px solid #f5d0a0;border-radius:12px;padding:10px 14px;font-size:.88em;margin-bottom:14px}
   @media (max-width:640px){ .lbl{min-width:0;width:100%} }
 </style>
@@ -162,6 +175,7 @@
     <h2 style="margin-top:14px">🗂️ 지난 기록</h2>
     <p class="hint">"새로 시작"을 누르면 지금 기록이 여기에 보관됩니다 (최근 30개). 이 컴퓨터에만 저장됩니다.</p>
     <ul id="sessions"></ul>
+    <p style="margin-top:8px"><button id="clearAll">🗑 지난 기록 모두 지우기</button></p>
     <p style="text-align:right;margin-top:10px"><button id="setClose">닫기</button></p>
   </section>
 
@@ -182,12 +196,18 @@
 
   <!-- 조절 -->
   <section class="card">
-    <div class="row" style="margin-bottom:12px">
-      <span class="lbl">말하는 사람</span>
-      <input type="text" id="spkName" placeholder="이름 (안 써도 됩니다)" style="width:14em">
-      <button id="nextBtn">👤 다음 사람 시작</button>
+    <div class="row" style="margin-bottom:12px;align-items:flex-start">
+      <span class="lbl" style="padding-top:8px">말하는 사람</span>
+      <div style="flex:1;min-width:260px">
+        <div id="roster" class="row" style="gap:8px"></div>
+        <div id="addForm" class="addform" hidden>
+          <input type="text" id="newName" placeholder="이름" style="width:12em">
+          <span id="newFlags" class="row" style="gap:6px"></span>
+          <span class="row" style="gap:6px"><button id="addOk" class="primary">추가</button><button id="addCancel">취소</button></span>
+        </div>
+      </div>
     </div>
-    <div class="row" style="margin-bottom:12px">
+    <div class="row" style="margin-bottom:12px" id="srcRow">
       <span class="lbl">말하는 언어</span>
       <span id="srcFlags" class="row" style="gap:8px"></span>
       <select id="srcLang" hidden>
@@ -212,7 +232,7 @@
       <button id="startBtn" class="bigbtn">● 듣기 시작</button>
       <div class="status" id="status" style="flex:1;min-width:240px"></div>
     </div>
-    <p class="hint" style="margin:10px 0 0">사람이 바뀌면: 이름 쓰기 → 말하는 언어 국기 → <b>다음 사람 시작</b> (듣는 중에도 됩니다)</p>
+    <p class="hint" style="margin:10px 0 0">말할 사람들을 미리 <b>+ 사람 추가</b>로 등록해 두고, 차례가 되면 <b>그 사람 버튼</b>을 누르세요. 그 사람 언어로 듣고 번역합니다.</p>
   </section>
 
   <!-- 기록 -->
@@ -638,27 +658,95 @@ function stopListening(){
 }
 function stopUI(){
   flushBuf();
+  setTimeout(renderRoster);
   if (runStart){ runAccum += Date.now() - runStart; runStart = 0; store.set('lv-runAccum-' + ses.id, runAccum); }
   if (wake){ wake.release().catch(() => {}); wake = null; }
   $('startBtn').textContent = '● 듣기 시작'; $('startBtn').classList.remove('on');
   saveNow(); renderStatus();
 }
-$('startBtn').onclick = () => want ? stopListening() : startListening();
-$('nextBtn').onclick = () => {
+$('startBtn').onclick = () => { want ? stopListening() : startListening(); renderRoster(); };
+/* ---------- 말하는 사람 명단 ---------- */
+const roster = () => (ses.roster = ses.roster || []);
+let editId = null, newSpeech = S.src;
+function speechOf(v){ return SPEECH.find(o => o.v === v) || SPEECH[0]; }
+function renderRoster(){
+  const box = $('roster'); box.innerHTML = '';
+  roster().forEach((p, k) => {
+    const w = document.createElement('span'); w.className = 'pwrap';
+    const b = document.createElement('button');
+    b.className = 'pchip' + (ses.active === p.id ? ' on' + (want ? '' : ' paused') : '');
+    b.innerHTML = `<span class="no">${k + 1}</span>${flagImg(speechOf(p.lang).flag)} <span></span>`;
+    b.querySelector('span:last-child').textContent = p.name || `${k + 1}번 사람`;
+    b.title = `${p.name || ''} · ${speechOf(p.lang).name} — 누르면 이 사람 차례로 듣기 시작`;
+    b.onclick = () => selectSpeaker(p);
+    const ed = document.createElement('button'); ed.className = 'mini'; ed.textContent = '✎'; ed.title = '고치기';
+    ed.onclick = () => openAdd(p);
+    const del = document.createElement('button'); del.className = 'mini'; del.textContent = '✕'; del.title = '명단에서 빼기';
+    del.onclick = () => {
+      if (!del.classList.contains('sure')){ del.classList.add('sure'); del.textContent = '빼기?'; setTimeout(() => { del.classList.remove('sure'); del.textContent = '✕'; }, 3000); return; }
+      ses.roster = roster().filter(x => x.id !== p.id); if (ses.active === p.id) ses.active = null;
+      saveNow(); renderRoster();
+    };
+    w.append(b, ed, del); box.append(w);
+  });
+  const add = document.createElement('button'); add.className = 'pchip addchip'; add.textContent = '+ 사람 추가';
+  add.onclick = () => openAdd(null);
+  box.append(add);
+  $('srcRow').hidden = roster().length > 0;  // 명단이 있으면 언어는 사람마다 정해져 있음
+}
+function renderNewFlags(){
+  $('newFlags').innerHTML = '';
+  SPEECH.forEach(o => {
+    const b = document.createElement('label'); b.className = 'fbtn src' + (newSpeech === o.v ? ' on' : '');
+    b.innerHTML = `${flagImg(o.flag)} ${o.name}`;
+    b.onclick = () => { newSpeech = o.v; renderNewFlags(); };
+    $('newFlags').append(b);
+  });
+}
+function openAdd(p){
+  editId = p ? p.id : null;
+  $('newName').value = p ? p.name : '';
+  newSpeech = p ? p.lang : (roster().length ? roster()[roster().length - 1].lang : S.src);
+  $('addOk').textContent = p ? '고치기' : '추가';
+  renderNewFlags(); $('addForm').hidden = false; $('newName').focus();
+}
+$('addCancel').onclick = () => { $('addForm').hidden = true; };
+$('addOk').onclick = () => {
+  const name = $('newName').value.trim();
+  if (editId){
+    const p = roster().find(x => x.id === editId);
+    if (p){
+      p.name = name; p.lang = newSpeech;
+      ses.entries.forEach(e => { if (e.div && e.spk === p.id) e.name = name; });
+      if (ses.active === p.id && S.src !== p.lang) setSrc(p.lang);
+      renderAll();
+    }
+  } else {
+    roster().push({id: Date.now(), name, lang: newSpeech});
+    $('newName').value = ''; $('newName').focus();
+  }
+  saveNow(); renderRoster();
+  if (editId){ $('addForm').hidden = true; editId = null; }
+  else toast('명단에 넣었습니다. 계속 추가하거나 "취소"로 닫으세요.');
+};
+$('newName').onkeydown = e => { if (e.key === 'Enter') $('addOk').click(); if (e.key === 'Escape') $('addCancel').click(); };
+
+function selectSpeaker(p){
+  if (ses.active === p.id && want){ toast(`지금 ${p.name || '이 사람'} 차례입니다.`); return; }
   if (interimText){ pushPiece(interimText); interimText = ''; }
   flushBuf();
+  if (S.src !== p.lang) setSrc(p.lang, true);
   if (!ses.entries.length){ ses.start = Date.now(); ses.src = S.src; }
   const last = ses.entries[ses.entries.length - 1];
-  const nm = $('spkName').value.trim();
-  if (last && last.div){ // 아직 아무 말도 없는 순서는 새로 만들지 않고 고쳐 씀
-    if (nm) last.name = nm; last.src = srcCode(S.src); last.t = Date.now();
-  } else ses.entries.push({div: true, t: Date.now(), name: nm, src: srcCode(S.src)});
-  $('spkName').value = '';
+  const d = {div: true, t: Date.now(), name: p.name, src: srcCode(p.lang), spk: p.id};
+  if (last && last.div) Object.assign(last, d);   // 아무 말도 없던 순서는 이 사람으로 바꿈
+  else ses.entries.push(d);
+  ses.active = p.id;
   updateEntry(ses.entries.length - 1); saveNow();
-  if (want){ startRec(false); }  // 앞사람 말이 섞이지 않게 새로 듣기
-  toast(`${spkNo(ses.entries.length - 1)}번째 순서를 시작합니다.`);
-};
-$('spkName').onkeydown = e => { if (e.key === 'Enter') $('nextBtn').click(); };
+  if (!want) startListening(); else startRec(false);
+  renderRoster();
+  toast(`${p.name || '다음 사람'} 차례 — ${speechOf(p.lang).name}로 듣습니다.`);
+}
 
 function renderStatus(){
   const listened = runAccum + (runStart ? Date.now() - runStart : 0);
@@ -1106,9 +1194,20 @@ $('newBtn').onclick = () => {
   if (!ses.entries.length) return toast('이미 새 기록입니다.');
   archive();
   store.del('lv-runAccum-' + ses.id);
-  ses = newSession(); runAccum = 0; queue.length = 0; saveNow(); fillMeta();
+  const keepRoster = roster().map(p => Object.assign({}, p));
+  ses = newSession(); ses.roster = keepRoster; runAccum = 0; queue.length = 0; saveNow(); fillMeta(); renderRoster();
   renderAll(); renderEngine(); renderSessions(); renderStatus();
   toast('지금까지의 기록은 ⚙️ 설정 → 지난 기록에 보관했습니다.');
+};
+$('clearAll').onclick = () => {
+  const b = $('clearAll');
+  if (!store.get('lv-sessions', []).length) return toast('지울 지난 기록이 없습니다.');
+  if (!b.dataset.sure){ b.dataset.sure = '1'; b.textContent = '정말 모두 지울까요? 한 번 더 누르세요'; b.style.background = 'var(--red)'; b.style.color = '#fff';
+    setTimeout(() => { delete b.dataset.sure; b.textContent = '🗑 지난 기록 모두 지우기'; b.style.background = ''; b.style.color = ''; }, 4000); return; }
+  store.get('lv-sessions', []).forEach(x => store.del('lv-runAccum-' + x.id));
+  store.set('lv-sessions', []);
+  delete b.dataset.sure; b.textContent = '🗑 지난 기록 모두 지우기'; b.style.background = ''; b.style.color = '';
+  renderSessions(); toast('지난 기록을 모두 지웠습니다. (지금 화면의 기록은 그대로입니다)');
 };
 function renderSessions(){
   const list = store.get('lv-sessions', []).slice().reverse();
@@ -1122,7 +1221,7 @@ function renderSessions(){
     open.onclick = () => {
       if (want) return toast('먼저 "듣기 멈춤"을 눌러 주세요.');
       archive(); store.set('lv-runAccum-' + ses.id, runAccum);
-      ses = x; runAccum = x.listened || 0; setTimeout(fillMeta); S.src = x.src || S.src; $('srcLang').value = S.src;
+      ses = x; runAccum = x.listened || 0; setTimeout(() => { fillMeta(); renderRoster(); }); S.src = x.src || S.src; $('srcLang').value = S.src;
       store.set('lv-sessions', store.get('lv-sessions', []).filter(y => y.id !== x.id));
       saveNow(); renderTargets(); renderAll(); renderEngine(); renderSessions(); renderStatus();
       $('setPanel').hidden = true; toast('지난 기록을 열었습니다. 이어서 들을 수도 있습니다.');
@@ -1176,12 +1275,18 @@ $('claudeOn').onchange = () => {
   if (S.claude && !S.key){ $('setPanel').hidden = false; $('apiKey').focus(); }
 };
 $('srcLang').value = S.src;
-$('srcLang').onchange = () => {
+function setSrc(v, quiet){
   if (want){ if (interimText){ pushPiece(interimText); interimText = ''; } flushBuf(); }
-  S.src = $('srcLang').value; store.set('lv-src', S.src);
+  S.src = v; $('srcLang').value = v; store.set('lv-src', S.src);
   if (!ses.entries.length) ses.src = S.src;
   renderTargets(); renderExLang();
-  if (want){ startRec(false); toast(`이제 ${L(srcCode(S.src)).name}로 듣습니다.`); }
+  if (want && !quiet){ startRec(false); toast(`이제 ${speechOf(v).name}로 듣습니다.`); }
+}
+$('srcLang').onchange = () => {
+  const v = $('srcLang').value;
+  const p = roster().find(x => x.id === ses.active);
+  if (p){ p.lang = v; renderRoster(); }   // 지금 말하는 사람의 언어도 함께 바꿈
+  setSrc(v);
 };
 $('viewSeg').onclick = e => {
   const v = e.target.dataset && e.target.dataset.v; if (!v) return;
@@ -1211,7 +1316,7 @@ Object.entries(MF).forEach(([id, k]) => {
     saveSoon();
   });
 });
-fillMeta();
+fillMeta(); renderRoster();
 applyFs(); applyView(); renderTargets(); renderEngine(); renderTotal(); renderAll(); renderStatus();
 // 닫히기 전에 번역되지 못한 문장 이어서 번역
 ses.entries.forEach((e, i) => { if ((e.pend || []).length) enqueue(i); });
