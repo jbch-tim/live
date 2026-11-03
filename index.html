@@ -25,7 +25,7 @@
   button:hover{filter:brightness(.97)}
   button:disabled{opacity:.45;cursor:default}
   button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
-  select,input[type=text],input[type=password],input[type=number]{padding:7px 10px;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:.92em}
+  select,input[type=text],input[type=password],input[type=number],input[type=date]{padding:7px 10px;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:.92em}
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:14px}
   .row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
   .lbl{color:var(--muted);font-size:.85em;min-width:6.5em}
@@ -116,6 +116,10 @@
   #sessions li button{padding:3px 10px;font-size:.82em}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#111827;color:#fff;padding:9px 18px;border-radius:12px;font-size:.9em;z-index:60;opacity:0;transition:opacity .25s;pointer-events:none;max-width:90vw;text-align:center}
   .toast.show{opacity:1}
+  .meta-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px}
+  .meta-grid label{display:flex;flex-direction:column;gap:4px;font-size:.82em;color:var(--muted)}
+  .meta-grid input{width:100%;font-size:1.05em;color:var(--ink)}
+  @media (max-width:640px){ .meta-grid{grid-template-columns:1fr} }
   .warnbox{background:#fff4e5;border:1px solid #f5d0a0;border-radius:12px;padding:10px 14px;font-size:.88em;margin-bottom:14px}
   @media (max-width:640px){ .lbl{min-width:0;width:100%} }
 </style>
@@ -152,6 +156,17 @@
     <p class="hint">"새로 시작"을 누르면 지금 기록이 여기에 보관됩니다 (최근 30개). 이 컴퓨터에만 저장됩니다.</p>
     <ul id="sessions"></ul>
     <p style="text-align:right;margin-top:10px"><button id="setClose">닫기</button></p>
+  </section>
+
+  <!-- 모임 정보 -->
+  <section class="card">
+    <h2 style="margin:0 0 10px;font-size:1em">📋 모임 정보 <span class="hint" style="font-weight:400">— 파일 이름과 파일 머리말, Claude·ChatGPT로 보낼 때 쓰입니다</span></h2>
+    <div class="meta-grid">
+      <label>모임명<input type="text" id="mTitle" placeholder="예: 수요 간증 집회"></label>
+      <label>날짜<input type="date" id="mDate"></label>
+      <label>장소<input type="text" id="mPlace" placeholder="예: 몬트리올 예수교회 본당"></label>
+      <label>대상<input type="text" id="mWho" placeholder="예: 성도 전체, 청년부"></label>
+    </div>
   </section>
 
   <!-- 조절 -->
@@ -281,7 +296,13 @@ const S = {
   view: store.get('lv-view', 'both'),
   trUrl: store.get('lv-trUrl', DEFAULT_TR_URL),
 };
-const newSession = () => ({id: Date.now(), start: Date.now(), entries: [], usage: {in:0, out:0, usd:0, n:0}, src: S.src});
+const pad = n => String(n).padStart(2, '0');
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+const newSession = () => {
+  const last = store.get('lv-meta-last', {});
+  return {id: Date.now(), start: Date.now(), entries: [], usage: {in:0, out:0, usd:0, n:0}, src: S.src,
+          meta: {title: last.title || '', date: today(), place: last.place || '', who: last.who || ''}};
+};
 let ses = store.get('lv-cur', null) || newSession();
 
 let saveTimer = null;
@@ -300,7 +321,6 @@ function saveNow(){
 let lastSaved = 0, saveFail = false;
 
 /* ---------- 도우미 ---------- */
-const pad = n => String(n).padStart(2, '0');
 const hms = t => { const d = new Date(t); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
 const dur = ms => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 3600)}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`; };
 const usd = v => v < 0.01 ? `$${v.toFixed(4)}` : `$${v.toFixed(3)}`;
@@ -821,9 +841,20 @@ $('cpOrig').onclick = () => copyText(lines('orig'), '원문을');
 $('cpTr').onclick = () => $('exLang').value ? copyText(lines('tr'), `${langName()} 번역을`) : toast('번역이 없습니다.');
 $('cpBoth').onclick = () => copyText(lines('both'), '원문과 번역을');
 
-function fileBase(){
+function meta(){
   const d = new Date(ses.start);
-  return `live-interpretation_${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
+  const m = ses.meta || {};
+  return {title: (m.title || '').trim(), date: m.date || `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+          place: (m.place || '').trim(), who: (m.who || '').trim()};
+}
+function dateLabel(ymd){
+  const d = new Date(ymd + 'T12:00:00');
+  return isNaN(d) ? ymd : `${ymd} (${d.toLocaleDateString('ko-KR', {weekday: 'short'})})`;
+}
+function fileBase(){
+  const m = meta(), d = new Date(ses.start);
+  const clean = t => t.replace(/[\\/:*?"<>|\n\r\t]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+  return m.title ? `${m.date}_${clean(m.title)}` : `실시간통역_${m.date}_${pad(d.getHours())}${pad(d.getMinutes())}`;
 }
 function download(name, blob){
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
@@ -835,7 +866,9 @@ function header(){
   const tr = LANGS.map(l => l.code).filter(c => talk().some(e => e.tr[c] != null));
   const srcs = LANGS.map(l => l.code).filter(c => talk().some(e => (e.src || srcCode(ses.src || S.src)) === c));
   const sp = ses.entries.filter(e => e.div).length;
-  return `실시간 통역 기록 — ${d.toLocaleString('ko-KR')}\n원문: ${srcs.map(c => L(c).name).join(', ')} · 번역: ${tr.map(c => L(c).name).join(', ')} · ${sp ? sp + '명 · ' : ''}${talk().length}문장`;
+  const m = meta();
+  const info = [`날짜: ${dateLabel(m.date)} ${hms(ses.start).slice(0, 5)}`, m.place && `장소: ${m.place}`, m.who && `대상: ${m.who}`].filter(Boolean).join(' · ');
+  return `${m.title ? m.title + ' — ' : ''}실시간 통역 기록\n${info}\n원문: ${srcs.map(c => L(c).name).join(', ')} · 번역: ${tr.map(c => L(c).name).join(', ')} · ${sp ? sp + '명 · ' : ''}${talk().length}문장`;
 }
 $('dlTxt').onclick = () => {
   if (!ses.entries.length) return toast('받을 내용이 없습니다.');
@@ -901,7 +934,11 @@ function chatPrompt(){
   const names = langs.map(c => ({ko:'한국어', en:'영어', fr:'프랑스어', zh:'중국어(간체)', es:'스페인어'})[c]);
   const bibles = langs.concat(srcs).filter((v, i, a) => a.indexOf(v) === i)
     .map(c => `${({ko:'한국어', en:'영어', fr:'프랑스어', zh:'중국어', es:'스페인어'})[c]}: ${L(c).bible}`).join(', ');
-  return `아래는 교회에서 한 ${srcs.map(c => K[c]).join('·')} 간증(또는 설교)을 음성 인식으로 받아 적은 원문입니다. ${new Date(ses.start).toLocaleDateString('ko-KR')}, ${talk().length}문장.${sp > 1 ? `
+  const m = meta();
+  const info = [m.title && `모임: ${m.title}`, `날짜: ${dateLabel(m.date)}`, m.place && `장소: ${m.place}`, m.who && `대상: ${m.who}`].filter(Boolean).join(' / ');
+  return `아래는 교회에서 한 ${srcs.map(c => K[c]).join('·')} 간증(또는 설교)을 음성 인식으로 받아 적은 원문입니다. ${talk().length}문장.
+${info}
+정리한 결과 맨 위에 위 모임 정보를 제목처럼 넣어 주세요.${sp > 1 ? `
 여러 사람(${sp}명)이 차례로 말했고, "=== N번째 순서 · 이름 ===" 줄로 사람이 나뉩니다. 사람마다 따로 나누어 정리하고 번역해 주세요.` : ''}
 
 부탁드립니다:
@@ -936,7 +973,7 @@ $('newBtn').onclick = () => {
   if (!ses.entries.length) return toast('이미 새 기록입니다.');
   archive();
   store.del('lv-runAccum-' + ses.id);
-  ses = newSession(); runAccum = 0; queue.length = 0; saveNow();
+  ses = newSession(); runAccum = 0; queue.length = 0; saveNow(); fillMeta();
   renderAll(); renderEngine(); renderSessions(); renderStatus();
   toast('지금까지의 기록은 ⚙️ 설정 → 지난 기록에 보관했습니다.');
 };
@@ -947,12 +984,12 @@ function renderSessions(){
   list.forEach(x => {
     const li = document.createElement('li');
     const sp = document.createElement('span');
-    sp.textContent = `${new Date(x.start).toLocaleString('ko-KR', {dateStyle: 'medium', timeStyle: 'short'})} · ${x.entries.filter(e => !e.div).length}문장 · ${(x.entries.find(e => e.div && e.name) || {}).name || (x.entries.find(e => !e.div) || {}).text || ''}`;
+    sp.textContent = `${(x.meta && x.meta.title) ? x.meta.title + ' · ' : ''}${new Date(x.start).toLocaleString('ko-KR', {dateStyle: 'medium', timeStyle: 'short'})} · ${x.entries.filter(e => !e.div).length}문장 · ${(x.entries.find(e => e.div && e.name) || {}).name || (x.entries.find(e => !e.div) || {}).text || ''}`;
     const open = document.createElement('button'); open.textContent = '열기';
     open.onclick = () => {
       if (want) return toast('먼저 "듣기 멈춤"을 눌러 주세요.');
       archive(); store.set('lv-runAccum-' + ses.id, runAccum);
-      ses = x; runAccum = x.listened || 0; S.src = x.src || S.src; $('srcLang').value = S.src;
+      ses = x; runAccum = x.listened || 0; setTimeout(fillMeta); S.src = x.src || S.src; $('srcLang').value = S.src;
       store.set('lv-sessions', store.get('lv-sessions', []).filter(y => y.id !== x.id));
       saveNow(); renderTargets(); renderAll(); renderEngine(); renderSessions(); renderStatus();
       $('setPanel').hidden = true; toast('지난 기록을 열었습니다. 이어서 들을 수도 있습니다.');
@@ -1029,6 +1066,19 @@ window.addEventListener('beforeunload', e => { flushBuf(); saveNow(); if (want){
 
 /* ---------- 시작 ---------- */
 if (!SR) $('noSR').hidden = false;
+const MF = {mTitle: 'title', mDate: 'date', mPlace: 'place', mWho: 'who'};
+function fillMeta(){
+  const m = meta();
+  Object.entries(MF).forEach(([id, k]) => { $(id).value = m[k] || ''; });
+}
+Object.entries(MF).forEach(([id, k]) => {
+  $(id).addEventListener('input', () => {
+    ses.meta = Object.assign({}, ses.meta, {[k]: $(id).value});
+    const keep = Object.assign({}, ses.meta); delete keep.date; store.set('lv-meta-last', keep);
+    saveSoon();
+  });
+});
+fillMeta();
 applyFs(); applyView(); renderTargets(); renderEngine(); renderTotal(); renderAll(); renderStatus();
 // 닫히기 전에 번역되지 못한 문장 이어서 번역
 ses.entries.forEach((e, i) => { if ((e.pend || []).length) enqueue(i); });
