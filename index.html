@@ -145,6 +145,10 @@
   .clearbtn{background:#fff;color:var(--red);border:1px solid #f1c4bd;padding:7px 12px}
   .clearbtn:hover{background:#fdf0ee;filter:none}
   .clearbtn.sure{background:var(--red);color:#fff;border-color:var(--red)}
+  .readbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:-2px 0 10px;padding:8px 12px;background:#fff;border:1px solid var(--line);border-radius:12px}
+  .readbar button{padding:5px 11px;display:inline-flex;align-items:center;gap:6px}
+  .readbar button.on{border-color:var(--accent);background:#eef4fb;font-weight:700}
+  .ent.reading{background:#fff7d6;border-radius:8px;box-shadow:0 0 0 6px #fff7d6}
   .warnbox{background:#fff4e5;border:1px solid #f5d0a0;border-radius:12px;padding:10px 14px;font-size:.88em;margin-bottom:14px}
   @media (max-width:640px){ .lbl{min-width:0;width:100%} }
 </style>
@@ -233,6 +237,11 @@
       <label class="switch"><input type="checkbox" id="claudeOn"><span class="track"></span><span>Claude 실시간 번역</span></label>
       <span id="engineNote" class="hint"></span>
     </div>
+    <div class="row" style="margin-bottom:12px">
+      <span class="lbl">녹음</span>
+      <label class="switch"><input type="checkbox" id="recOn"><span class="track"></span><span>🎙 소리도 함께 녹음</span></label>
+      <span id="recNote" class="hint">듣는 동안 목소리를 녹음해서, 끝난 뒤 ⬇️ 저장 → 녹음 파일로 받습니다.</span>
+    </div>
     <div class="row">
       <button id="startBtn" class="bigbtn">● 듣기 시작</button>
       <div class="status" id="status" style="flex:1;min-width:240px"></div>
@@ -249,6 +258,17 @@
     </div>
     <button id="clearBtn" class="clearbtn" title="지금 화면의 기록을 모두 지웁니다">🗑 지우기</button>
     <span id="countInfo" class="hint" style="margin-left:auto"></span>
+  </div>
+  <div class="readbar" id="readBar">
+    <span class="hint" style="font-weight:600">🔊 읽기</span>
+    <span id="readLangs" class="row" style="gap:6px"></span>
+    <span id="readCtl" class="row" style="gap:6px" hidden>
+      <button id="readPause">⏸ 잠시 멈춤</button>
+      <button id="readStop">⏹ 그만</button>
+    </span>
+    <select id="readRate" title="읽는 빠르기" style="margin-left:auto">
+      <option value="0.8">천천히</option><option value="1" selected>보통 빠르기</option><option value="1.2">조금 빠르게</option>
+    </select>
   </div>
   <div id="log"><div class="empty" id="emptyMsg">"듣기 시작"을 누르고 말씀을 시작하면 여기에 받아 적고 번역합니다.</div><div class="interim" id="interim"></div></div>
 
@@ -269,6 +289,7 @@
         <button id="dlPdf">PDF 파일</button>
         <button id="dlXlsx">Excel 파일</button>
         <button id="dlTxt">텍스트 파일</button>
+        <button id="dlAudio">🎙 녹음 파일</button>
       </div>
     </div>
     <div class="dd">
@@ -505,7 +526,7 @@ function renderAll(){
   ses.entries.forEach((e, i) => frag.append(entryEl(e, i)));
   g.insertBefore(frag, $('interim'));
   $('emptyMsg').hidden = ses.entries.length > 0;
-  scrollEnd(); renderCount(); renderStage(); renderExLang();
+  scrollEnd(); renderCount(); renderStage(); renderExLang(); renderReadBar(); markReading();
 }
 function updateEntry(i){
   const stick = nearBottom();
@@ -516,6 +537,8 @@ function updateEntry(i){
   $('emptyMsg').hidden = true;
   if (stick) scrollEnd(); else $('jumpBtn').hidden = false;
   renderCount(); renderStage();
+  if (!$('readBar').hidden !== !!talk().length || $('readLangs').children.length !== usedLangs().length + 1) renderReadBar();
+  if (RD.on && i === RD.i) markReading();
 }
 function renderCount(){
   const n = talk().length, sp = ses.entries.filter(e => e.div).length;
@@ -653,7 +676,7 @@ function startListening(){
   if (!SR){ toast('Chrome에서 열어 주세요.'); return; }
   want = true; restarts = 0; runStart = Date.now();
   if (!ses.entries.length){ ses.start = Date.now(); ses.src = S.src; }
-  startRec(false); lockScreen();
+  startRec(false); lockScreen(); recordStart();
   $('startBtn').textContent = '■ 듣기 멈춤'; $('startBtn').classList.add('on');
   renderStatus();
 }
@@ -667,10 +690,93 @@ function stopUI(){
   setTimeout(renderRoster);
   if (runStart){ runAccum += Date.now() - runStart; runStart = 0; store.set('lv-runAccum-' + ses.id, runAccum); }
   if (wake){ wake.release().catch(() => {}); wake = null; }
+  recordPause();
   $('startBtn').textContent = '● 듣기 시작'; $('startBtn').classList.remove('on');
   saveNow(); renderStatus();
 }
 $('startBtn').onclick = () => { want ? stopListening() : startListening(); renderRoster(); };
+/* ---------- 녹음 ---------- */
+S.record = store.get('lv-record', false);
+let mr = null, mrStream = null, mrSeg = 0, mrIdx = 0, mrMime = '', recRun = 0, recStart = 0, recBytes = 0;
+const idb = (() => {
+  let p = null;
+  return () => p || (p = new Promise((ok, no) => {
+    const r = indexedDB.open('live-audio', 1);
+    r.onupgradeneeded = () => { const st = r.result.createObjectStore('chunks', {autoIncrement: true}); st.createIndex('sid', 'sid'); };
+    r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error);
+  }));
+})();
+async function idbPut(rec){ const db = await idb(); return new Promise((ok, no) => { const t = db.transaction('chunks', 'readwrite'); t.objectStore('chunks').add(rec); t.oncomplete = ok; t.onerror = () => no(t.error); }); }
+async function idbGet(sid){ const db = await idb(); return new Promise((ok, no) => { const r = db.transaction('chunks').objectStore('chunks').index('sid').getAll(sid); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); }); }
+async function idbDel(sid){
+  try{
+    const db = await idb();
+    await new Promise(ok => { const t = db.transaction('chunks', 'readwrite'); const st = t.objectStore('chunks');
+      const r = st.index('sid').openCursor(IDBKeyRange.only(sid)); r.onsuccess = () => { const c = r.result; if (c){ c.delete(); c.continue(); } }; t.oncomplete = ok; t.onerror = ok; });
+  }catch(e){}
+}
+function pickMime(){
+  for (const m of ['audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'])
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m;
+  return '';
+}
+async function recordStart(){
+  if (!S.record || !window.MediaRecorder) return;
+  if (mr && mr.state === 'paused'){ mr.resume(); recStart = Date.now(); renderStatus(); return; }
+  if (mr) return;
+  try{
+    mrStream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true}});
+  }catch(e){ toast('녹음을 시작하지 못했습니다. 마이크 허용을 확인해 주세요. (받아 적기는 계속됩니다)'); return; }
+  mrMime = pickMime();
+  mr = new MediaRecorder(mrStream, mrMime ? {mimeType: mrMime, audioBitsPerSecond: 64000} : {});
+  mrMime = mr.mimeType || mrMime || 'audio/webm';
+  mrSeg = Date.now(); mrIdx = 0;
+  const sid = ses.id, seg = mrSeg, mime = mrMime;
+  mr.ondataavailable = ev => {
+    if (!ev.data || !ev.data.size) return;
+    recBytes += ev.data.size;
+    idbPut({sid, seg, i: mrIdx++, blob: ev.data, mime}).catch(() => toast('녹음 저장 공간이 모자랍니다.'));
+    ses.hasAudio = true;
+  };
+  mr.start(5000); recStart = Date.now();
+  renderStatus();
+}
+function recordPause(){
+  if (mr && mr.state === 'recording'){ try{ mr.requestData(); mr.pause(); }catch(e){} recRun += Date.now() - recStart; recStart = 0; }
+  renderStatus();
+}
+function recordStop(){
+  if (!mr) return;
+  if (recStart){ recRun += Date.now() - recStart; recStart = 0; }
+  try{ mr.stop(); }catch(e){}
+  try{ mrStream.getTracks().forEach(t => t.stop()); }catch(e){}
+  mr = null; mrStream = null; renderStatus();
+}
+$('recOn').checked = S.record;
+$('recOn').onchange = () => {
+  S.record = $('recOn').checked; store.set('lv-record', S.record);
+  if (S.record && want) recordStart();
+  if (!S.record) recordStop();
+  toast(S.record ? '듣기를 시작하면 소리도 녹음합니다.' : '녹음을 껐습니다. 이미 녹음된 것은 남아 있습니다.');
+};
+const extOf = mime => /mp4/.test(mime) ? 'm4a' : /ogg/.test(mime) ? 'ogg' : 'webm';
+$('dlAudio').onclick = async () => {
+  if (mr) try{ mr.requestData(); }catch(e){}
+  await new Promise(r => setTimeout(r, 400));
+  let rows = [];
+  try{ rows = await idbGet(ses.id); }catch(e){}
+  if (!rows.length) return toast('이 기록에는 녹음이 없습니다. "소리도 함께 녹음"을 켜고 들으세요.');
+  const segs = {};
+  rows.forEach(r => (segs[r.seg] = segs[r.seg] || []).push(r));
+  const keys = Object.keys(segs).sort();
+  keys.forEach((k, n) => {
+    const list = segs[k].sort((a, b) => a.i - b.i), mime = list[0].mime;
+    const name = `${fileBase()}_녹음${keys.length > 1 ? '_' + (n + 1) : ''}.${extOf(mime)}`;
+    setTimeout(() => download(name, new Blob(list.map(r => r.blob), {type: mime.split(';')[0]})), n * 700);
+  });
+  if (keys.length > 1) toast(`녹음이 중간에 끊겨서 ${keys.length}개 파일로 받습니다.`);
+};
+
 /* ---------- 말하는 사람 명단 ---------- */
 const roster = () => (ses.roster = ses.roster || []);
 let editId = null, newSpeech = S.src;
@@ -765,6 +871,8 @@ function renderStatus(){
   } else {
     bits.push(`<span class="live-dot"></span>멈춤${listened ? ' · 들은 시간 ' + dur(listened) : ''}`);
   }
+  if (mr){ const t = recRun + (recStart ? Date.now() - recStart : 0);
+    bits.push(mr.state === 'recording' ? `<span class="pill warn">● 녹음 ${dur(t)}</span>` : `<span class="pill">녹음 멈춤 ${dur(t)}</span>`); }
   if (saveFail) bits.push('<span class="pill warn">저장 실패</span>');
   else if (lastSaved) bits.push(`<span class="pill ok">자동 저장 ${hms(lastSaved)}</span>`);
   if (queue.length + busy > 0) bits.push(`<span class="pill">번역 대기 ${queue.length + busy}</span>`);
@@ -916,6 +1024,85 @@ function backfill(langs){
   if (n) saveSoon();
   return n;
 }
+
+/* ---------- 소리 내어 읽기 ---------- */
+const VOICE_LANG = {ko: 'ko-KR', en: 'en-US', fr: 'fr-FR', zh: 'zh-CN', es: 'es-ES'};
+const RD = {on: false, paused: false, lang: null, i: -1};
+function voiceFor(tag){
+  const vs = speechSynthesis.getVoices(), base = tag.slice(0, 2);
+  return vs.find(v => v.lang === tag && /Google/.test(v.name)) || vs.find(v => v.lang === tag) ||
+         vs.find(v => v.lang && v.lang.startsWith(base) && /Google/.test(v.name)) || vs.find(v => v.lang && v.lang.startsWith(base)) || null;
+}
+function readText(e){
+  if (RD.lang === 'orig') return {text: e.text, tag: e.src === 'fr' && S.src === 'fr-CA' ? 'fr-CA' : VOICE_LANG[e.src || 'ko']};
+  const t = e.tr && e.tr[RD.lang];
+  return t ? {text: t, tag: VOICE_LANG[RD.lang]} : null;
+}
+function nextIdx(from){
+  for (let k = from; k < ses.entries.length; k++){ const e = ses.entries[k]; if (!e.div && readText(e)) return k; }
+  return -1;
+}
+function markReading(){
+  document.querySelectorAll('.ent.reading').forEach(n => n.classList.remove('reading'));
+  if (!RD.on) return;
+  const n = $('log').querySelector(`.ent[data-i="${RD.i}"]`);
+  if (n){ n.classList.add('reading'); const g = $('log'); g.scrollTop = n.offsetTop - g.clientHeight / 3; }
+}
+function speakCur(){
+  if (!RD.on || RD.paused) return;
+  const k = nextIdx(RD.i);
+  if (k < 0){ readStop(); toast('끝까지 읽었습니다.'); return; }
+  RD.i = k; markReading();
+  const r = readText(ses.entries[k]);
+  const u = new SpeechSynthesisUtterance(r.text);
+  u.lang = r.tag; const v = voiceFor(r.tag); if (v) u.voice = v;
+  u.rate = +$('readRate').value || 1;
+  const my = u;
+  u.onend = () => { if (RD.cur === my && RD.on && !RD.paused){ RD.i++; speakCur(); } };
+  u.onerror = () => { if (RD.cur === my && RD.on && !RD.paused){ RD.i++; setTimeout(speakCur, 200); } };
+  RD.cur = u; speechSynthesis.speak(u);
+}
+function readStart(lang){
+  if (!('speechSynthesis' in window)) return toast('이 브라우저는 읽기를 지원하지 않습니다.');
+  speechSynthesis.cancel();
+  // 이미 읽던 곳이 있으면 그 문장부터, 아니면 처음부터
+  const from = RD.on && RD.i >= 0 ? RD.i : 0;
+  Object.assign(RD, {on: true, paused: false, lang, i: from});
+  if (want) toast('듣는 중이라 읽는 소리가 다시 받아 적힐 수 있습니다. 이어폰을 쓰거나 듣기를 멈추세요.');
+  renderReadBar(); speakCur();
+}
+function readStop(){
+  Object.assign(RD, {on: false, paused: false, cur: null});
+  speechSynthesis.cancel(); markReading(); renderReadBar();
+}
+$('readPause').onclick = () => {
+  if (!RD.on) return;
+  if (!RD.paused){ RD.paused = true; RD.cur = null; speechSynthesis.cancel(); }
+  else { RD.paused = false; speakCur(); }
+  renderReadBar();
+};
+$('readStop').onclick = readStop;
+function renderReadBar(){
+  const box = $('readLangs'); box.innerHTML = '';
+  const opts = [{k: 'orig', label: '원문'}].concat(usedLangs().map(c => ({k: c, label: `${flagImg(L(c).flag)} ${L(c).name}`})));
+  opts.forEach(o => {
+    const b = document.createElement('button');
+    b.innerHTML = o.label; b.className = RD.on && RD.lang === o.k ? 'on' : '';
+    b.title = o.k === 'orig' ? '원문을 읽습니다' : `${L(o.k).name} 번역을 읽습니다`;
+    b.onclick = () => readStart(o.k);
+    box.append(b);
+  });
+  $('readCtl').hidden = !RD.on;
+  $('readPause').textContent = RD.paused ? '▶ 계속' : '⏸ 잠시 멈춤';
+  $('readBar').hidden = !talk().length;
+}
+if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => {};
+// 문장을 누르면 거기서부터 읽기 (읽는 중일 때)
+$('log').addEventListener('click', ev => {
+  if (!RD.on) return;
+  const n = ev.target.closest('.ent[data-i]'); if (!n || ev.target.closest('button,[contenteditable]')) return;
+  RD.i = +n.dataset.i; RD.paused = false; RD.cur = null; speechSynthesis.cancel(); renderReadBar(); speakCur();
+});
 
 /* ---------- 크게 보기 ---------- */
 function renderStage(){
@@ -1203,6 +1390,7 @@ $('clearBtn').onclick = () => {
     setTimeout(() => { b.classList.remove('sure'); b.textContent = '🗑 지우기'; }, 3500); return;
   }
   b.classList.remove('sure'); b.textContent = '🗑 지우기';
+  recordStop(); recRun = 0; idbDel(ses.id);
   buf = ''; interimText = ''; showInterim();
   ses.entries = []; queue.length = 0; ses.active = null;
   ses.start = Date.now(); ses.usage = {in: 0, out: 0, usd: 0, n: 0};
@@ -1216,6 +1404,7 @@ $('newBtn').onclick = () => {
   archive();
   store.del('lv-runAccum-' + ses.id);
   const keepRoster = roster().map(p => Object.assign({}, p));
+  recordStop(); recRun = 0;
   ses = newSession(); ses.roster = keepRoster; runAccum = 0; queue.length = 0; saveNow(); fillMeta(); renderRoster();
   renderAll(); renderEngine(); renderSessions(); renderStatus();
   toast('지금까지의 기록은 ⚙️ 설정 → 지난 기록에 보관했습니다.');
@@ -1225,7 +1414,7 @@ $('clearAll').onclick = () => {
   if (!store.get('lv-sessions', []).length) return toast('지울 지난 기록이 없습니다.');
   if (!b.dataset.sure){ b.dataset.sure = '1'; b.textContent = '정말 모두 지울까요? 한 번 더 누르세요'; b.style.background = 'var(--red)'; b.style.color = '#fff';
     setTimeout(() => { delete b.dataset.sure; b.textContent = '🗑 지난 기록 모두 지우기'; b.style.background = ''; b.style.color = ''; }, 4000); return; }
-  store.get('lv-sessions', []).forEach(x => store.del('lv-runAccum-' + x.id));
+  store.get('lv-sessions', []).forEach(x => { store.del('lv-runAccum-' + x.id); idbDel(x.id); });
   store.set('lv-sessions', []);
   delete b.dataset.sure; b.textContent = '🗑 지난 기록 모두 지우기'; b.style.background = ''; b.style.color = '';
   renderSessions(); toast('지난 기록을 모두 지웠습니다. (지금 화면의 기록은 그대로입니다)');
@@ -1250,7 +1439,7 @@ function renderSessions(){
     const del = document.createElement('button'); del.textContent = '지우기';
     del.onclick = () => {
       if (del.dataset.sure !== '1'){ del.dataset.sure = '1'; del.textContent = '정말 지우기'; setTimeout(() => { del.dataset.sure = ''; del.textContent = '지우기'; }, 3000); return; }
-      store.set('lv-sessions', store.get('lv-sessions', []).filter(y => y.id !== x.id)); renderSessions();
+      store.set('lv-sessions', store.get('lv-sessions', []).filter(y => y.id !== x.id)); idbDel(x.id); renderSessions();
     };
     li.append(sp, open, del); ul.append(li);
   });
@@ -1321,7 +1510,7 @@ function applyFs(){ document.documentElement.style.setProperty('--fs', S.fs + 'p
 $('fsUp').onclick = () => { S.fs = Math.min(34, S.fs + 2); applyFs(); };
 $('fsDown').onclick = () => { S.fs = Math.max(14, S.fs - 2); applyFs(); };
 
-window.addEventListener('beforeunload', e => { flushBuf(); saveNow(); if (want){ e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', e => { if (mr) try{ mr.requestData(); }catch(_){} flushBuf(); saveNow(); if (want){ e.preventDefault(); e.returnValue = ''; } });
 
 /* ---------- 시작 ---------- */
 if (!SR) $('noSR').hidden = false;
