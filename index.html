@@ -392,10 +392,11 @@ function makeRec(){
     for (let k = ev.resultIndex; k < ev.results.length; k++){
       const res = ev.results[k];
       const txt = res[0].transcript;
-      if (res.isFinal) addEntry(txt);
+      if (res.isFinal) pushPiece(txt);
       else interim += txt;
     }
     interimText = interim.trim();
+    if (interimText) lastSpeech = Date.now();
     showInterim();
   };
   r.onerror = ev => {
@@ -411,7 +412,7 @@ function makeRec(){
   };
   r.onend = () => {
     recActive = false;
-    if (interimText){ addEntry(interimText); interimText = ''; showInterim(); } // 끊길 때 받아 적던 말 살리기
+    if (interimText){ pushPiece(interimText); interimText = ''; showInterim(); } // 끊길 때 받아 적던 말 살리기
     if (want){
       setTimeout(() => { if (want && !recActive) startRec(true); }, netBackoff || 150);
     } else stopUI();
@@ -436,19 +437,53 @@ setInterval(() => {
   renderStatus();
 }, 2000);
 
-function addEntry(raw){
+/* 짧게 끊긴 말 조각을 모아 한 문장으로 만들기 */
+let buf = '', bufStart = 0, lastSpeech = 0;
+const HOLD_IDLE = 2000;   // 말이 이만큼 멈추면 모은 것을 문장으로
+const HOLD_MAX = 12000;   // 아무리 길어도 이만큼 지나면 문장으로
+function isCJK(){ return /^(ko|zh)/.test(srcCode(S.src)); }
+function looksDone(t){
+  const sc = srcCode(S.src);
+  if (/[.?!。？！]$/.test(t)) return true;
+  if (sc === 'ko') return /(니다|니까|어요|아요|여요|에요|예요|세요|해요|지요|죠|네요|군요|구나|는다|인다|이다|았다|었다|였다|겠다|합시다|십시오|시다|라|까)$/.test(t);
+  return false;
+}
+function pushPiece(raw){
+  const t = raw.replace(/\s+/g, ' ').trim();
+  if (!t) return;
+  if (!buf) bufStart = Date.now();
+  buf = buf ? buf + ' ' + t : t;
+  lastSpeech = Date.now();
+  const len = isCJK() ? buf.replace(/\s/g, '').length : buf.split(' ').length;
+  const minLen = isCJK() ? 10 : 6, maxLen = isCJK() ? 90 : 45;
+  if ((len >= minLen && looksDone(buf)) || len >= maxLen) flushBuf();
+  else showInterim();
+}
+function flushBuf(){
+  if (!buf) return;
+  const t = buf, at = bufStart; buf = ''; bufStart = 0;
+  addEntry(t, at); showInterim();
+}
+setInterval(() => {
+  if (!buf) return;
+  const now = Date.now();
+  if ((!interimText && now - lastSpeech > HOLD_IDLE) || now - bufStart > HOLD_MAX) flushBuf();
+}, 300);
+
+function addEntry(raw, at){
   const text = raw.replace(/\s+/g, ' ').trim();
   if (!text) return;
-  const e = {t: Date.now(), text, tr: {}, pend: activeTargets(), fail: []};
+  const e = {t: at || Date.now(), text, tr: {}, pend: activeTargets(), fail: []};
   ses.entries.push(e);
   const i = ses.entries.length - 1;
   updateEntry(i); renderExLang(); saveSoon();
   enqueue(i);
 }
 function showInterim(){
-  $('interim').textContent = interimText ? '… ' + interimText : '';
-  $('stageInterim').textContent = interimText;
-  if (interimText && nearBottom()) scrollEnd();
+  const all = [buf, interimText].filter(Boolean).join(' ');
+  $('interim').textContent = all ? '… ' + all : '';
+  $('stageInterim').textContent = all;
+  if (all && nearBottom()) scrollEnd();
 }
 
 /* 화면 꺼짐 방지 */
@@ -479,6 +514,7 @@ function stopListening(){
   stopUI();
 }
 function stopUI(){
+  flushBuf();
   if (runStart){ runAccum += Date.now() - runStart; runStart = 0; store.set('lv-runAccum-' + ses.id, runAccum); }
   if (wake){ wake.release().catch(() => {}); wake = null; }
   $('startBtn').textContent = '● 듣기 시작'; $('startBtn').classList.remove('on');
@@ -839,7 +875,7 @@ function applyFs(){ document.documentElement.style.setProperty('--fs', S.fs + 'p
 $('fsUp').onclick = () => { S.fs = Math.min(34, S.fs + 2); applyFs(); };
 $('fsDown').onclick = () => { S.fs = Math.max(14, S.fs - 2); applyFs(); };
 
-window.addEventListener('beforeunload', e => { saveNow(); if (want){ e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', e => { flushBuf(); saveNow(); if (want){ e.preventDefault(); e.returnValue = ''; } });
 
 /* ---------- 시작 ---------- */
 if (!SR) $('noSR').hidden = false;
