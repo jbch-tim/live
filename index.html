@@ -33,6 +33,13 @@
   .chk input{width:17px;height:17px;accent-color:var(--accent);margin:0}
   .chk.off{opacity:.35;pointer-events:none}
   .chk.on{border-color:var(--accent);background:#eef4fb}
+  .flag{width:24px;height:18px;border-radius:3px;box-shadow:0 0 0 1px rgba(0,0,0,.12);object-fit:cover;flex:none;vertical-align:middle}
+  .fbtn{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:#fff;cursor:pointer;user-select:none;font-size:.92em}
+  .fbtn input{display:none}
+  .fbtn.on{border-color:var(--accent);background:#eef4fb;box-shadow:0 0 0 1px var(--accent) inset;font-weight:600}
+  .fbtn.on.src{border-color:var(--red);background:#fdf0ee;box-shadow:0 0 0 1px var(--red) inset}
+  .fbtn .tick{display:none;color:var(--accent);font-weight:700}
+  .fbtn.on .tick{display:inline}
   /* 스위치 */
   .switch{display:inline-flex;align-items:center;gap:10px;cursor:pointer;user-select:none;font-weight:600}
   .switch input{display:none}
@@ -77,6 +84,9 @@
   .ent .t{margin-top:4px;font-size:1em;display:flex;gap:8px}
   .ent .t .lg{flex:none;font-size:.68em;font-weight:700;color:#fff;background:var(--accent);border-radius:6px;padding:1px 6px;height:1.7em;margin-top:.25em;line-height:1.5em}
   .ent .t.cl .lg{background:#d97706}
+  .ent .t .lgf{flex:none;padding-top:.2em}
+  .ent .t .lgf .flag{width:22px;height:16px}
+  .ent .t.cl .lgf .flag{box-shadow:0 0 0 2px #d97706}
   .ent .t .tx{flex:1;min-width:0}
   .ent .t.wait .tx{color:var(--muted);font-style:italic}
   .ent .t.fail .tx{color:var(--red)}
@@ -146,18 +156,24 @@
 
   <!-- 조절 -->
   <section class="card">
-    <div class="row" style="margin-bottom:10px">
+    <div class="row" style="margin-bottom:12px">
+      <span class="lbl">말하는 사람</span>
+      <input type="text" id="spkName" placeholder="이름 (안 써도 됩니다)" style="width:14em">
+      <button id="nextBtn">👤 다음 사람 시작</button>
+    </div>
+    <div class="row" style="margin-bottom:12px">
       <span class="lbl">말하는 언어</span>
-      <select id="srcLang">
+      <span id="srcFlags" class="row" style="gap:8px"></span>
+      <select id="srcLang" hidden>
         <option value="ko-KR">한국어</option>
-        <option value="en-US">English (영어)</option>
-        <option value="fr-CA">Français – Canada (프랑스어 퀘벡)</option>
-        <option value="fr-FR">Français – France (프랑스어 프랑스)</option>
-        <option value="cmn-Hans-CN">中文 (중국어)</option>
-        <option value="es-ES">Español (스페인어)</option>
+        <option value="en-US">English</option>
+        <option value="fr-CA">Français (Québec)</option>
+        <option value="fr-FR">Français (France)</option>
+        <option value="cmn-Hans-CN">中文</option>
+        <option value="es-ES">Español</option>
       </select>
     </div>
-    <div class="row" style="margin-bottom:10px">
+    <div class="row" style="margin-bottom:12px">
       <span class="lbl">번역할 언어</span>
       <span id="targets" class="row" style="gap:8px"></span>
     </div>
@@ -170,20 +186,7 @@
       <button id="startBtn" class="bigbtn">● 듣기 시작</button>
       <div class="status" id="status" style="flex:1;min-width:240px"></div>
     </div>
-    <div class="row" style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)">
-      <span class="lbl">말하는 사람</span>
-      <input type="text" id="spkName" placeholder="이름 (안 써도 됩니다)" style="width:12em">
-      <select id="spkLang" title="이 사람이 말하는 언어">
-        <option value="ko-KR">한국어</option>
-        <option value="en-US">English (영어)</option>
-        <option value="fr-CA">Français – Canada (프랑스어 퀘벡)</option>
-        <option value="fr-FR">Français – France (프랑스어 프랑스)</option>
-        <option value="cmn-Hans-CN">中文 (중국어)</option>
-        <option value="es-ES">Español (스페인어)</option>
-      </select>
-      <button id="nextBtn">👤 다음 사람 시작</button>
-      <span class="hint" style="width:100%">사람이 바뀔 때 이름과 <b>그 사람이 말하는 언어</b>를 고르고 누르세요. 듣는 중에도 됩니다.</span>
-    </div>
+    <p class="hint" style="margin:10px 0 0">사람이 바뀌면 이름을 쓰고 그 사람의 <b>말하는 언어 국기</b>를 누른 뒤 <b>다음 사람 시작</b>을 누르세요. 듣는 중에도 됩니다.</p>
   </section>
 
   <!-- 기록 -->
@@ -242,13 +245,19 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const LANGS = [
-  {code:'ko', name:'한국어',   tag:'KO', en:'Korean',  bible:'개역한글 (Korean Revised Version, 1961)'},
-  {code:'en', name:'English',  tag:'EN', en:'English', bible:'New King James Version (NKJV)'},
-  {code:'fr', name:'Français', tag:'FR', en:'French',  bible:'Louis Segond (1910)'},
-  {code:'zh', name:'中文',     tag:'中', en:'Simplified Chinese', bible:'和合本 (Chinese Union Version, simplified)', g:'zh-CN'},
-  {code:'es', name:'Español',  tag:'ES', en:'Spanish', bible:'Reina-Valera 1960'},
+  {code:'ko', name:'한국어',   tag:'KO', flag:'kr', en:'Korean',  bible:'개역한글 (Korean Revised Version, 1961)'},
+  {code:'en', name:'English',  tag:'EN', flag:'us', en:'English', bible:'New King James Version (NKJV)'},
+  {code:'fr', name:'Français', tag:'FR', flag:'fr', en:'French',  bible:'Louis Segond (1910)'},
+  {code:'zh', name:'中文',     tag:'中', flag:'cn', en:'Simplified Chinese', bible:'和合本 (Chinese Union Version, simplified)', g:'zh-CN'},
+  {code:'es', name:'Español',  tag:'ES', flag:'es', en:'Spanish', bible:'Reina-Valera 1960'},
 ];
 const L = c => LANGS.find(l => l.code === c);
+const flagImg = f => `<img class="flag" src="lib/flags/${f}.svg" alt="">`;
+const SPEECH = [
+  {v:'ko-KR', flag:'kr', name:'한국어'}, {v:'en-US', flag:'us', name:'English'},
+  {v:'fr-CA', flag:'ca', name:'Français (Québec)'}, {v:'fr-FR', flag:'fr', name:'Français (France)'},
+  {v:'cmn-Hans-CN', flag:'cn', name:'中文'}, {v:'es-ES', flag:'es', name:'Español'},
+];
 const srcCode = v => v.startsWith('cmn') ? 'zh' : v.slice(0, 2);
 const DEFAULT_TR_URL = 'https://claude.ai/artifact/LBF6fPQedUfGs53v9RNXGe';
 const MODEL = 'claude-haiku-5-5';
@@ -308,16 +317,27 @@ async function copyText(text, what){
 }
 
 /* ---------- 언어 선택 화면 ---------- */
+function renderSrcFlags(){
+  $('srcFlags').innerHTML = '';
+  SPEECH.forEach(o => {
+    const b = document.createElement('label');
+    b.className = 'fbtn src' + (S.src === o.v ? ' on' : '');
+    b.innerHTML = `${flagImg(o.flag)} ${o.name}`;
+    b.onclick = () => { if (S.src === o.v) return; $('srcLang').value = o.v; $('srcLang').onchange(); };
+    $('srcFlags').append(b);
+  });
+}
 function renderTargets(){
+  renderSrcFlags();
   const sc = srcCode(S.src);
   $('targets').innerHTML = '';
   LANGS.forEach(l => {
     const lab = document.createElement('label');
     const same = l.code === sc;
     const on = S.targets.includes(l.code);
-    lab.className = 'chk' + (on ? ' on' : '');
+    lab.className = 'fbtn' + (on ? ' on' : '');
     lab.title = same ? '지금 말하는 언어입니다. 다른 언어로 말한 사람의 문장만 이 언어로 번역합니다.' : '';
-    lab.innerHTML = `<input type="checkbox" ${on ? 'checked' : ''}> ${l.name}${same ? ' <span class="hint">(말하는 언어)</span>' : ''}`;
+    lab.innerHTML = `<input type="checkbox" ${on ? 'checked' : ''}>${flagImg(l.flag)} ${l.name} <span class="tick">✓</span>`;
     lab.querySelector('input').onchange = e => {
       S.targets = e.target.checked ? [...new Set([...S.targets, l.code])] : S.targets.filter(c => c !== l.code);
       S.targets = LANGS.map(x => x.code).filter(c => S.targets.includes(c));
@@ -385,7 +405,7 @@ function entryEl(e, i){
     nm.textContent = e.name || ''; nm.dataset.ph = '이름';
     nm.onblur = () => { e.name = nm.textContent.trim(); saveSoon(); };
     nm.onkeydown = ev => { if (ev.key === 'Enter'){ ev.preventDefault(); nm.blur(); } };
-    const meta = document.createElement('span'); meta.className = 'meta'; meta.textContent = `${hms(e.t)} · ${L(e.src).name}`;
+    const meta = document.createElement('span'); meta.className = 'meta'; meta.innerHTML = `${hms(e.t)} · ${flagImg(L(e.src).flag)} ${L(e.src).name}`;
     d.append(nm, meta, delBtn(i, '이 순서 표시')); return d;
   }
   const d = document.createElement('div'); d.className = 'ent'; d.dataset.i = i;
@@ -397,7 +417,7 @@ function entryEl(e, i){
   langs.forEach(c => {
     const t = document.createElement('div');
     const tx = document.createElement('span'); tx.className = 'tx';
-    const lg = document.createElement('span'); lg.className = 'lg'; lg.textContent = L(c).tag;
+    const lg = document.createElement('span'); lg.className = 'lgf'; lg.innerHTML = flagImg(L(c).flag); lg.title = L(c).name;
     if (e.tr && e.tr[c] != null){
       t.className = 't' + (e.eng === 'claude' ? ' cl' : '');
       tx.textContent = e.tr[c];
@@ -585,7 +605,6 @@ function stopUI(){
 }
 $('startBtn').onclick = () => want ? stopListening() : startListening();
 $('nextBtn').onclick = () => {
-  if ($('spkLang').value !== S.src){ $('srcLang').value = $('spkLang').value; $('srcLang').onchange(); }
   if (interimText){ pushPiece(interimText); interimText = ''; }
   flushBuf();
   if (!ses.entries.length){ ses.start = Date.now(); ses.src = S.src; }
@@ -933,7 +952,7 @@ function renderSessions(){
     open.onclick = () => {
       if (want) return toast('먼저 "듣기 멈춤"을 눌러 주세요.');
       archive(); store.set('lv-runAccum-' + ses.id, runAccum);
-      ses = x; runAccum = x.listened || 0; S.src = x.src || S.src; $('srcLang').value = S.src; $('spkLang').value = S.src;
+      ses = x; runAccum = x.listened || 0; S.src = x.src || S.src; $('srcLang').value = S.src;
       store.set('lv-sessions', store.get('lv-sessions', []).filter(y => y.id !== x.id));
       saveNow(); renderTargets(); renderAll(); renderEngine(); renderSessions(); renderStatus();
       $('setPanel').hidden = true; toast('지난 기록을 열었습니다. 이어서 들을 수도 있습니다.');
@@ -986,9 +1005,8 @@ $('claudeOn').onchange = () => {
   S.claude = $('claudeOn').checked; store.set('lv-claude', S.claude); renderEngine();
   if (S.claude && !S.key){ $('setPanel').hidden = false; $('apiKey').focus(); }
 };
-$('srcLang').value = S.src; $('spkLang').value = S.src;
+$('srcLang').value = S.src;
 $('srcLang').onchange = () => {
-  $('spkLang').value = $('srcLang').value;
   if (want){ if (interimText){ pushPiece(interimText); interimText = ''; } flushBuf(); }
   S.src = $('srcLang').value; store.set('lv-src', S.src);
   if (!ses.entries.length) ses.src = S.src;
