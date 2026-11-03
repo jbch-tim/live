@@ -160,8 +160,12 @@
 
   <!-- 모임 정보 -->
   <section class="card">
-    <h2 style="margin:0 0 10px;font-size:1em">📋 모임 정보 <span class="hint" style="font-weight:400">— 파일 이름과 파일 머리말, Claude·ChatGPT로 보낼 때 쓰입니다</span></h2>
+    <h2 style="margin:0 0 10px;font-size:1em">📋 모임 정보 <span class="hint" style="font-weight:400">— 파일 이름·머리말과 번역할 때 쓰입니다</span></h2>
     <div class="meta-grid">
+      <label>모임 종류<select id="mKind" style="width:100%;font-size:1.05em;color:var(--ink)">
+        <option value="church">⛪ 교회 (간증·설교·성경공부)</option>
+        <option value="general">🏢 일반 (강연·회의·세미나 등)</option>
+      </select></label>
       <label>모임명<input type="text" id="mTitle" placeholder="예: 정기 모임, 세미나, 강연회"></label>
       <label>날짜<input type="date" id="mDate"></label>
       <label>장소<input type="text" id="mPlace" placeholder="예: 본관 2층 회의실"></label>
@@ -303,7 +307,7 @@ const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.g
 const newSession = () => {
   const last = store.get('lv-meta-last', {});
   return {id: Date.now(), start: Date.now(), entries: [], usage: {in:0, out:0, usd:0, n:0}, src: S.src,
-          meta: {title: last.title || '', date: today(), place: last.place || '', who: last.who || ''}};
+          meta: {kind: last.kind || 'church', title: last.title || '', date: today(), place: last.place || '', who: last.who || ''}};
 };
 let ses = store.get('lv-cur', null) || newSession();
 
@@ -723,6 +727,14 @@ async function googleTranslate(text, sl, tl, tries = 2){
 
 let noThinkingParam = store.get('lv-noThink', false);
 function systemPrompt(sc, langs){
+  if (meta().kind === 'general') return `You are a professional live interpreter at a meeting or event (a talk, lecture, seminar or discussion). You receive one short segment of a long spoken talk as captured by speech recognition, in ${L(sc).en}.
+Translate the segment into: ${langs.map(c => L(c).en).join(', ')}.
+Rules:
+- Speech recognition makes mistakes and has no punctuation. Silently fix obvious mis-hearings using context (names, places, technical terms) and translate what the speaker meant.
+- Faithful, natural spoken style that matches the speaker's tone and register. Do not add, explain, summarize or comment.
+- A segment may be an incomplete sentence; translate it as a natural fragment that continues the previous context.
+- Keep names, numbers, dates and technical terms accurate and consistent.
+Return ONLY a JSON object with exactly these keys: ${langs.map(c => `"${c}"`).join(', ')}. Each value is the translation string. No other text.`;
   return `You are a live interpreter at a Korean-Canadian church in Montreal. You receive one short segment of a long spoken talk (a testimony, sermon or Bible lecture) as captured by speech recognition, in ${L(sc).en}.
 Translate the segment into: ${langs.map(c => L(c).en).join(', ')}.
 Rules:
@@ -846,7 +858,7 @@ $('cpBoth').onclick = () => copyText(lines('both'), '원문과 번역을');
 function meta(){
   const d = new Date(ses.start);
   const m = ses.meta || {};
-  return {title: (m.title || '').trim(), date: m.date || `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+  return {kind: m.kind || 'church', title: (m.title || '').trim(), date: m.date || `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
           place: (m.place || '').trim(), who: (m.who || '').trim()};
 }
 function dateLabel(ymd){
@@ -1026,16 +1038,18 @@ function chatPrompt(){
     .map(c => `${({ko:'한국어', en:'영어', fr:'프랑스어', zh:'중국어', es:'스페인어'})[c]}: ${L(c).bible}`).join(', ');
   const m = meta();
   const info = [m.title && `모임: ${m.title}`, `날짜: ${dateLabel(m.date)}`, m.place && `장소: ${m.place}`, m.who && `대상: ${m.who}`].filter(Boolean).join(' / ');
-  return `아래는 교회에서 한 ${srcs.map(c => K[c]).join('·')} 간증(또는 설교)을 음성 인식으로 받아 적은 원문입니다. ${talk().length}문장.
+  const church = m.kind !== 'general';
+  return `아래는 ${church ? '교회에서 한' : '모임에서 한'} ${srcs.map(c => K[c]).join('·')} ${church ? '간증(또는 설교)' : '말(강연·발표·대화 등)'}을 음성 인식으로 받아 적은 원문입니다. ${talk().length}문장.
 ${info}
 정리한 결과 맨 위에 위 모임 정보를 제목처럼 넣어 주세요.${sp > 1 ? `
 여러 사람(${sp}명)이 차례로 말했고, "=== N번째 순서 · 이름 ===" 줄로 사람이 나뉩니다. 사람마다 따로 나누어 정리하고 번역해 주세요.` : ''}
 
 부탁드립니다:
-1. 음성 인식 때문에 잘못 적힌 말(특히 성경 인물·책 이름, 교회 용어)을 문맥에 맞게 고치고, 문장 부호를 넣고, 내용 흐름에 따라 문단을 나누어 "정리된 원문"을 보여 주세요. 말한 내용은 빼거나 보태지 마세요.
+1. 음성 인식 때문에 잘못 적힌 말(특히 ${church ? '성경 인물·책 이름, 교회 용어' : '사람·장소 이름, 전문 용어'})을 문맥에 맞게 고치고, 문장 부호를 넣고, 내용 흐름에 따라 문단을 나누어 "정리된 원문"을 보여 주세요. 말한 내용은 빼거나 보태지 마세요.
 2. 정리된 원문을 ${names.join(', ')}로 번역해 주세요(원문과 같은 언어는 빼 주세요). 언어마다 제목을 달아 따로 보여 주세요.
-- 말하는 사람의 말투와 감정이 살아 있는 자연스러운 번역으로 해 주세요.
-- 성경 구절을 인용하거나 언급하면 이 번역본의 표현을 따라 주세요: ${bibles}.
+- 말하는 사람의 말투와 감정이 살아 있는 자연스러운 번역으로 해 주세요.${church ? `
+- 성경 구절을 인용하거나 언급하면 이 번역본의 표현을 따라 주세요: ${bibles}.` : `
+- 이름, 숫자, 날짜, 전문 용어는 정확하고 일관되게 옮겨 주세요.`}
 
 --- 원문 ---
 ${body}`;
@@ -1156,13 +1170,13 @@ window.addEventListener('beforeunload', e => { flushBuf(); saveNow(); if (want){
 
 /* ---------- 시작 ---------- */
 if (!SR) $('noSR').hidden = false;
-const MF = {mTitle: 'title', mDate: 'date', mPlace: 'place', mWho: 'who'};
+const MF = {mKind: 'kind', mTitle: 'title', mDate: 'date', mPlace: 'place', mWho: 'who'};
 function fillMeta(){
   const m = meta();
   Object.entries(MF).forEach(([id, k]) => { $(id).value = m[k] || ''; });
 }
 Object.entries(MF).forEach(([id, k]) => {
-  $(id).addEventListener('input', () => {
+  $(id).addEventListener(id === 'mKind' ? 'change' : 'input', () => {
     ses.meta = Object.assign({}, ses.meta, {[k]: $(id).value});
     const keep = Object.assign({}, ses.meta); delete keep.date; store.set('lv-meta-last', keep);
     saveSoon();
