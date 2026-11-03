@@ -131,8 +131,6 @@
   .pchip .no{display:inline-grid;place-items:center;width:1.5em;height:1.5em;border-radius:50%;background:#e5e7eb;font-size:.78em;font-weight:700}
   .pchip.on{border-color:var(--red);background:#fdf0ee;box-shadow:0 0 0 1px var(--red) inset;font-weight:700}
   .pchip.on .no{background:var(--red);color:#fff}
-  .pchip.on::after{content:"● 듣는 중";font-size:.72em;color:var(--red);font-weight:600}
-  .pchip.on.paused::after{content:"⏸ 멈춤";color:var(--muted)}
   .pwrap{display:inline-flex;align-items:center;gap:0}
   .pwrap .mini{border:none;background:transparent;color:#c0c4cc;padding:4px 3px;font-size:.78em}
   .pwrap .mini:hover{color:var(--ink)}
@@ -264,7 +262,7 @@
       <button id="startBtn" class="bigbtn">● 듣기 시작</button>
       <div class="status" id="status" style="flex:1;min-width:240px"></div>
     </div>
-    <p class="hint" style="margin:10px 0 0">말할 사람들을 미리 <b>+ 사람 추가</b>로 등록해 두고, 차례가 되면 <b>그 사람 버튼</b>을 누르세요. 그 사람 언어로 듣고 번역합니다.</p>
+    <p class="hint" style="margin:10px 0 0">말할 사람들을 미리 <b>+ 사람 추가</b>로 등록해 두세요. 차례가 되면 아래 기록 창에서 그 사람의 <b>🎙 이 사람 말하기</b>를 누르고, 끝나면 <b>⏸ 멈춤</b>을 누르세요.</p>
   </section>
 
   <!-- 기록 -->
@@ -872,8 +870,8 @@ function renderRoster(){
     b.className = 'pchip' + (ses.active === p.id ? ' on' + (want ? '' : ' paused') : '');
     b.innerHTML = `<span class="no">${k + 1}</span>${flagImg(speechOf(p.lang).flag)} <span></span>`;
     b.querySelector('span:last-child').textContent = p.name || `${k + 1}번 사람`;
-    b.title = ses.active === p.id && want ? '누르면 멈춥니다' : ses.active === p.id ? '누르면 이어서 듣습니다' : `${p.name || ''} · ${speechOf(p.lang).name} — 누르면 이 사람 차례로 듣기 시작`;
-    b.onclick = () => selectSpeaker(p);
+    b.title = '누르면 이름·언어를 고칩니다. 끌어서 순서를 바꿀 수 있습니다. 듣기·멈춤은 아래 기록 창에서 합니다.';
+    b.onclick = () => openAdd(p);
     const ed = document.createElement('button'); ed.className = 'mini'; ed.textContent = '✎'; ed.title = '고치기';
     ed.onclick = () => openAdd(p);
     const del = document.createElement('button'); del.className = 'mini'; del.textContent = '✕'; del.title = '명단에서 빼기';
