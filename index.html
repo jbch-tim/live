@@ -194,61 +194,89 @@
   body.cv-focus:not(.show-head) header, body.cv-focus:not(.show-head) #cvTop{display:none}
   .menubtn{position:fixed;bottom:18px;right:16px;z-index:40;width:44px;height:44px;border-radius:12px;background:var(--accent);color:#fff;border:none;font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,.2)}
   /* ===== 대화 모드 ===== */
+  body.mode-live .cv-dock{display:none !important}
   .cv-small{padding:6px 12px;font-size:.88em}
-  .cv-now{margin:0 0 12px;display:flex;flex-direction:column;gap:10px}
-  .cv-now:empty{display:none}
-  .cv-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px 16px;position:relative}
-  .cv-card.me{border-left:6px solid var(--accent)}
-  .cv-card.them{border-left:6px solid #d97706}
-  .cv-card .cv-o{color:var(--muted);font-size:.9em;padding-right:50px}
-  .cv-card .cv-o .flag{margin-right:4px;vertical-align:-3px}
-  .cv-card .cv-t{font-size:clamp(22px,4.2vw,36px);line-height:1.35;font-weight:650;margin-top:4px}
-  .cv-card .cv-t.wait{color:var(--muted);font-weight:400;font-size:1.1em}
-  .cv-card .cv-raw{font-size:.8em;color:var(--muted)}
-  .cv-say{position:absolute;top:10px;right:10px;width:44px;height:44px;border-radius:50%;padding:0;font-size:20px}
+  /* 대화가 위로 올라가는 창 */
+  .cv-stream{display:flex;flex-direction:column;gap:12px;overflow-y:auto;padding:6px 4px 10px;height:var(--sh,50vh);min-height:180px;scroll-behavior:smooth;
+    -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 40px);mask-image:linear-gradient(to bottom,transparent 0,#000 40px)}
+  .cv-empty{margin:auto;color:var(--muted);text-align:center;padding:20px}
+  .cv-b{max-width:88%;display:flex;flex-direction:column;gap:4px}
+  .cv-b.me{align-self:flex-end;align-items:flex-end}
+  .cv-b.them{align-self:flex-start;align-items:flex-start}
+  .cv-b .cv-o{font-size:var(--ofs,15px);color:#4b5563;padding:0 6px;line-height:1.4}
+  .cv-b .cv-o .flag{width:20px;height:15px;margin-right:5px;vertical-align:-2px}
+  .cv-b .cv-t{position:relative;border-radius:18px;padding:12px 56px 12px 16px;font-size:var(--tfs,28px);line-height:1.35;font-weight:650;border:2px solid}
+  .cv-b.me .cv-t{background:#e6effb;border-color:#1e4d8c;color:#12305a;border-bottom-right-radius:6px}
+  .cv-b.them .cv-t{background:#fff1dc;border-color:#d97706;color:#6b3a00;border-bottom-left-radius:6px}
+  .cv-b .cv-t .flag{width:24px;height:18px;margin-right:8px;vertical-align:-2px}
+  .cv-b .cv-t.wait{font-weight:400;color:var(--muted)}
+  .cv-b .cv-raw{font-size:.78em;color:var(--muted);padding:0 6px}
+  .cv-b .pol{font-size:.72em;color:#9a6b12;background:#fff4dc;border:1px solid #f0d9a8;border-radius:6px;padding:0 5px;margin-left:4px}
+  .cv-say{position:absolute;top:50%;right:8px;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;padding:0;font-size:18px;background:rgba(255,255,255,.8)}
   .cv-say.on{background:var(--red);color:#fff;border-color:var(--red);animation:blink 1.2s infinite}
-  .cv-box{margin-bottom:14px}
+  .cv-b.old{opacity:.55}
+  /* 아래 고정 입력창 */
+  .cv-dock{position:fixed;left:0;right:0;bottom:0;z-index:25;background:var(--bg);border-top:1px solid var(--line);box-shadow:0 -4px 16px rgba(0,0,0,.08);padding:0 max(10px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}
+  .cv-dock > *{max-width:1000px;margin-left:auto;margin-right:auto}
   .cv-tools{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-  @media (max-width:700px){ .cv-tools .hint{display:none} }
-  .cv-panels{display:grid;gap:0;height:var(--cvh,260px);min-height:160px}
-  .cv-panels.side{grid-template-columns:minmax(150px,var(--r1,1fr)) 12px minmax(150px,var(--r2,1fr))}
-  .cv-panels.stack{grid-template-rows:minmax(120px,var(--r1,1fr)) 12px minmax(120px,var(--r2,1fr))}
-  .cv-panel{display:flex;flex-direction:column;background:#fff;border:1px solid var(--line);border-radius:14px;padding:8px 10px;min-width:0;min-height:0}
-  .cv-panel.listening{border-color:var(--red);box-shadow:0 0 0 2px rgba(192,57,43,.25)}
-  .cv-ph{display:flex;align-items:center;gap:6px;font-weight:700;font-size:.95em;margin-bottom:4px}
+  .cv-listen{margin-left:auto;font-size:.85em;color:var(--red);font-weight:700}
+  .cv-panels{display:grid;gap:0;height:var(--cvh,220px);min-height:130px}
+  .cv-panels.side{grid-template-columns:minmax(140px,var(--r1,1fr)) 12px minmax(140px,var(--r2,1fr))}
+  .cv-panels.stack{grid-template-rows:minmax(110px,var(--r1,1fr)) 10px minmax(110px,var(--r2,1fr))}
+  .cv-panel{display:flex;flex-direction:column;background:#fff;border:2px solid var(--line);border-radius:14px;padding:6px 8px;min-width:0;min-height:0}
+  .cv-panel.me{border-color:#b7cbe8}
+  .cv-panel.them{border-color:#f1cf9c}
+  .cv-panel.listening{border-color:var(--red);box-shadow:0 0 0 3px rgba(192,57,43,.2)}
+  .cv-ph{display:flex;align-items:center;gap:6px;font-weight:700;font-size:clamp(13px,2.6vw,15px);margin-bottom:4px}
+  .cv-ph .flag{width:20px;height:15px}
   .cv-x{margin-left:auto;border:none;background:transparent;color:#9ca3af;padding:2px 8px}
-  .cv-panel textarea{flex:1;min-height:40px;width:100%;resize:none;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font:inherit;font-size:1.08em;line-height:1.5;background:#fffdf8}
+  .cv-panel textarea{flex:1;min-height:30px;width:100%;resize:none;border:1px solid var(--line);border-radius:10px;padding:6px 10px;font:inherit;font-size:clamp(15px,2.8vw,18px);line-height:1.45;background:#fffdf8}
   .cv-panel textarea:focus{outline:2px solid var(--accent);outline-offset:0}
-  .cv-act{display:flex;gap:8px;margin-top:8px}
-  .cv-act button{flex:1;min-height:46px;font-size:1em;font-weight:700;border-radius:12px}
+  .cv-act{display:flex;gap:clamp(4px,1vw,8px);margin-top:6px}
+  .cv-act button{flex:1;min-width:0;height:clamp(38px,6.5vh,52px);padding:0 6px;font-size:clamp(13px,2.8vw,17px);font-weight:700;border-radius:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .cv-mic{background:#fff;color:var(--red);border:2px solid var(--red)}
   .cv-mic.on{background:var(--red);color:#fff;animation:blink 1.4s infinite}
-  .cv-go{background:var(--accent);color:#fff;border:none}
+  .cv-go{color:#fff;border:none}
+  .cv-panel.me .cv-go{background:#1e4d8c}
+  .cv-panel.them .cv-go{background:#c26a06}
   .cv-split{display:flex;align-items:center;justify-content:center;cursor:col-resize;touch-action:none}
   .cv-panels.stack .cv-split{cursor:row-resize}
   .cv-split span{display:block;width:4px;height:40px;border-radius:4px;background:#cfc8bb}
   .cv-panels.stack .cv-split span{width:40px;height:4px}
   .cv-grip{height:14px;display:flex;align-items:center;justify-content:center;cursor:row-resize;touch-action:none}
-  .cv-grip span{width:50px;height:4px;border-radius:4px;background:#cfc8bb}
+  .cv-grip.top{height:16px}
+  .cv-grip span{width:56px;height:5px;border-radius:4px;background:#cfc8bb}
+  /* 대화 기록 */
+  .cv-hist{margin-top:10px}
   .cv-hh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   #cvHist{height:var(--hh,260px);overflow:auto;margin-top:8px;border-top:1px solid var(--line)}
-  .cv-h{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;padding:8px 0;border-bottom:1px solid var(--line)}
+  .cv-h{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;padding:8px 0 8px 8px;border-bottom:1px solid var(--line)}
   .cv-h .tm{color:var(--muted);font-size:.75em;padding-top:.3em;font-variant-numeric:tabular-nums}
   .cv-h .o{font-size:.9em;color:var(--muted)}
-  .cv-h .t{font-size:1em}
   .cv-h .acts{display:flex;gap:4px;align-items:start}
   .cv-h .acts button{border:none;background:transparent;padding:2px 6px;color:#9ca3af}
   .cv-h .acts button:hover{color:var(--ink)}
   .cv-h .acts button.sure{background:var(--red);color:#fff;border-radius:6px}
-  .cv-h.me{border-left:3px solid var(--accent);padding-left:8px}
-  .cv-h.them{border-left:3px solid #d97706;padding-left:8px}
-  .cv-h .pol{font-size:.7em;color:#9a6b12;background:#fff4dc;border:1px solid #f0d9a8;border-radius:6px;padding:0 5px}
+  .cv-h.me{border-left:4px solid #1e4d8c}
+  .cv-h.them{border-left:4px solid #d97706}
+  .cv-h.me .t{color:#12305a}
+  .cv-h.them .t{color:#6b3a00}
+  .menubtn{top:10px;bottom:auto}
   @media (max-width:700px){
     header{padding:8px 10px}
     header h1{display:none}
     .modeseg button{padding:6px 9px;font-size:.85em}
     main{padding:10px 8px 60px}
-    .cv-act button{min-height:50px}
+    .cv-tip{display:none}
+    .cv-b{max-width:94%}
+    #cvTop{padding:8px 10px}
+    #cvTop .lbl{display:none}
+    #cvLangs{flex-wrap:nowrap;overflow-x:auto;width:100%;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+    #cvLangs .fbtn{flex:none;padding:5px 10px}
+    #cvTop .row{margin-bottom:6px !important}
+    #cvTop .switch{font-size:.9em;gap:6px}
+    #cvNote{display:none}
+    .cv-panels.side .cv-ph .hint{display:none}
   }
   .warnbox{background:#fff4e5;border:1px solid #f5d0a0;border-radius:12px;padding:10px 14px;font-size:.88em;margin-bottom:14px}
   @media (max-width:640px){ .lbl{min-width:0;width:100%} }
@@ -438,31 +466,7 @@
     </div>
   </section>
 
-  <section class="cv-now" id="cvNow"></section>
-
-  <div class="cv-box" id="cvBox">
-    <div class="cv-tools"><button id="cvLayoutBtn" class="cv-small" title="입력칸을 나란히 또는 위아래로">⇆ 나란히</button><span class="hint">가운데 막대와 아래 막대를 끌어서 크기를 바꿀 수 있습니다</span></div>
-    <div class="cv-panels side" id="cvPanels">
-      <div class="cv-panel" id="cvPanelMe">
-        <div class="cv-ph"><span id="cvMeLabel"></span><button class="cv-x" data-clear="me" title="지우기">✕</button></div>
-        <textarea id="cvMeText" placeholder="한국어로 말하거나 쓰세요"></textarea>
-        <div class="cv-act">
-          <button class="cv-mic" data-mic="me">🎤 말하기</button>
-          <button class="cv-go" data-go="me">➤ 통역</button>
-        </div>
-      </div>
-      <div class="cv-split" id="cvSplit" title="끌어서 크기 조절"><span></span></div>
-      <div class="cv-panel" id="cvPanelThem">
-        <div class="cv-ph"><span id="cvThemLabel"></span><button class="cv-x" data-clear="them" title="지우기">✕</button></div>
-        <textarea id="cvThemText" placeholder=""></textarea>
-        <div class="cv-act">
-          <button class="cv-mic" data-mic="them">🎤 말하기</button>
-          <button class="cv-go" data-go="them">➤ 통역</button>
-        </div>
-      </div>
-    </div>
-    <div class="cv-grip" id="cvBoxGrip" title="끌어서 높이 조절"><span></span></div>
-  </div>
+  <section class="cv-stream" id="cvStream"><div class="cv-empty" id="cvEmpty">아래 입력창에 말하거나 쓰면, 통역된 대화가 여기에 차례로 올라갑니다.</div></section>
 
   <section class="card cv-hist">
     <div class="cv-hh">
@@ -478,8 +482,37 @@
       <div class="cv-grip" id="cvHistGrip" title="끌어서 높이 조절"><span></span></div>
     </div>
   </section>
+  <div id="cvSpacer"></div>
 </div>
+
 </main>
+<div class="cv-dock" id="cvDock">
+  <div class="cv-grip top" id="cvDockGrip" title="끌어서 입력창 높이 조절"><span></span></div>
+  <div class="cv-tools">
+    <button id="cvLayoutBtn" class="cv-small" title="입력칸을 나란히 또는 위아래로">⇆ 나란히</button>
+    <span class="hint cv-tip">위 막대·가운데 막대를 끌어서 크기를 바꿉니다</span>
+    <span id="cvListen" class="cv-listen"></span>
+  </div>
+  <div class="cv-panels side" id="cvPanels">
+    <div class="cv-panel me" id="cvPanelMe">
+      <div class="cv-ph"><span id="cvMeLabel"></span><button class="cv-x" data-clear="me" title="입력칸 비우기">✕</button></div>
+      <textarea id="cvMeText" placeholder="한국어로 말하거나 쓰세요"></textarea>
+      <div class="cv-act">
+        <button class="cv-mic" data-mic="me">🎤 말하기</button>
+        <button class="cv-go" data-go="me">➤ 통역</button>
+      </div>
+    </div>
+    <div class="cv-split" id="cvSplit" title="끌어서 크기 조절"><span></span></div>
+    <div class="cv-panel them" id="cvPanelThem">
+      <div class="cv-ph"><span id="cvThemLabel"></span><button class="cv-x" data-clear="them" title="입력칸 비우기">✕</button></div>
+      <textarea id="cvThemText" placeholder=""></textarea>
+      <div class="cv-act">
+        <button class="cv-mic" data-mic="them">🎤 말하기</button>
+        <button class="cv-go" data-go="them">➤ 통역</button>
+      </div>
+    </div>
+  </div>
+</div>
 <button id="menuBtn" class="menubtn" title="메뉴 보기" hidden>☰</button>
 
 
@@ -2077,13 +2110,15 @@ const CV = {
   speak: store.get('cv-speak', true),
   layout: store.get('cv-layout', innerWidth < 700 ? 'stack' : 'side'),
   ratio: store.get('cv-ratio', 0.5),
-  boxH: store.get('cv-boxH', innerWidth < 700 ? 440 : 260),
+  boxH: store.get('cv-boxH2', innerWidth < 700 ? 300 : 210),
   histH: store.get('cv-histH', 260),
   histOpen: store.get('cv-histOpen', true),
   turns: store.get('cv-turns', []),
 };
+const STREAM_N = 10;   // 위 창에 보여 줄 최근 대화 수
 const cvSave = () => { if (!store.set('cv-turns', CV.turns)){ CV.turns.splice(0, Math.ceil(CV.turns.length / 4)); store.set('cv-turns', CV.turns); } };
 const partner = () => CV.partner === 'auto' ? CV.detected : CV.partner;
+const cvTA = side => $(side === 'me' ? 'cvMeText' : 'cvThemText');
 
 /* --- 모드 전환 --- */
 function setMode(m){
@@ -2094,29 +2129,48 @@ function setMode(m){
   store.set('lv-mode', m);
   if (m === 'conv'){
     if (want){ stopListening(); renderRoster(); toast('실시간 통역 듣기를 멈추고 대화 모드로 왔습니다.'); }
-    cvRenderAll();
+    cvRenderTop(); cvRenderAll();
   } else { cvStopMic(false); cvStopSpeak(); document.body.classList.remove('cv-focus', 'show-head'); $('menuBtn').hidden = true; }
 }
 $('modeSeg').onclick = ev => { const b = ev.target.closest('button'); if (b) setMode(b.dataset.m); };
 
+/* --- 화면 높이 맞추기: 입력창은 아래 고정, 대화 창은 그 위를 채움 --- */
+function cvFit(){
+  if (!document.body.classList.contains('mode-conv')) return;
+  const dockH = $('cvDock').offsetHeight;
+  $('cvSpacer').style.height = dockH + 'px';
+  const vh = window.visualViewport ? visualViewport.height : innerHeight;
+  const top = $('cvStream').getBoundingClientRect().top + window.scrollY;
+  const h = Math.max(180, Math.round(vh - dockH - top - 8));
+  $('cvStream').style.setProperty('--sh', h + 'px');
+}
+addEventListener('resize', () => { cvFit(); cvRenderStream(); });
+if (window.visualViewport) visualViewport.addEventListener('resize', cvFit);
+
 /* --- 위쪽 메뉴 숨기기 (입력하는 동안) --- */
-function cvFocusOn(){ document.body.classList.add('cv-focus'); $('menuBtn').hidden = false; }
+function cvFocusOn(){
+  if (document.body.classList.contains('cv-focus')) return;
+  document.body.classList.add('cv-focus'); $('menuBtn').hidden = false; $('menuBtn').textContent = '☰';
+  scrollTo(0, 0); cvFit();
+}
 function cvFocusOff(){
   setTimeout(() => {
     const a = document.activeElement;
-    if (cvSide || (a && a.closest && a.closest('.cv-panel'))) return;
-    document.body.classList.remove('cv-focus', 'show-head'); $('menuBtn').hidden = true;
+    if (cvSide || (a && a.closest && a.closest('.cv-dock'))) return;
+    if (!document.body.classList.contains('cv-focus')) return;
+    document.body.classList.remove('cv-focus', 'show-head'); $('menuBtn').hidden = true; cvFit();
   }, 150);
 }
 ['cvMeText', 'cvThemText'].forEach(id => { $(id).addEventListener('focus', cvFocusOn); $(id).addEventListener('blur', cvFocusOff); });
 document.addEventListener('pointerdown', ev => {
   if (!document.body.classList.contains('cv-focus') || cvSide) return;
-  if (ev.target.closest('.cv-panel, #menuBtn, header, #cvTop, .cv-tools')) return;
-  document.body.classList.remove('cv-focus', 'show-head'); $('menuBtn').hidden = true; $('menuBtn').textContent = '☰';
+  if (ev.target.closest('.cv-dock, #menuBtn, header, #cvTop')) return;
+  document.body.classList.remove('cv-focus', 'show-head'); $('menuBtn').hidden = true; cvFit();
 });
 $('menuBtn').onclick = () => {
   document.body.classList.toggle('show-head');
   $('menuBtn').textContent = document.body.classList.contains('show-head') ? '✕' : '☰';
+  cvFit();
 };
 
 /* --- 상대 언어 --- */
@@ -2124,14 +2178,18 @@ function cvRenderLangs(){
   const box = $('cvLangs'); box.innerHTML = '';
   const auto = document.createElement('label'); auto.className = 'fbtn' + (CV.partner === 'auto' ? ' on' : '');
   auto.innerHTML = `🌐 자동 감지${CV.partner === 'auto' ? ` <span class="hint">(지금: ${flagImg(cvL(CV.detected).flag)} ${cvL(CV.detected).name})</span>` : ''}`;
-  auto.onclick = () => { CV.partner = 'auto'; store.set('cv-partner', 'auto'); cvRenderTop(); };
+  auto.onclick = () => { CV.partner = 'auto'; store.set('cv-partner', 'auto'); cvLangChanged(); };
   box.append(auto);
   CVL.forEach(l => {
     const b = document.createElement('label'); b.className = 'fbtn' + (CV.partner === l.c ? ' on' : '');
     b.innerHTML = `${flagImg(l.flag)} ${l.name}`;
-    b.onclick = () => { CV.partner = l.c; store.set('cv-partner', l.c); cvRenderTop(); };
+    b.onclick = () => { CV.partner = l.c; store.set('cv-partner', l.c); cvLangChanged(); };
     box.append(b);
   });
+}
+function cvLangChanged(){
+  cvRenderTop();
+  if (cvSide === 'them'){ cvCloseRec(); cvOpenRec(); }   // 듣는 중이면 새 언어로 다시 듣기
 }
 function cvRenderTop(){
   cvRenderLangs();
@@ -2142,7 +2200,7 @@ function cvRenderTop(){
   $('cvClaude').checked = CV.claude; $('cvSpeak').checked = CV.speak;
   $('cvNote').innerHTML = CV.claude
     ? (S.key ? `<span class="cost">Claude로 번역하고, 내 한국어도 다듬습니다 · 이번 기록 ${usd(ses.usage.usd)}</span>` : '<span style="color:var(--red)">Anthropic API 키가 없습니다. ⚙️ 설정에서 넣어 주세요. (그동안은 무료 번역)</span>')
-    : '무료 번역(Google) · 🎤 버튼마다 듣는 언어가 정해져 있습니다' + (CV.partner === 'auto' ? ' · 자동 감지는 글로 쓰면 바로 알아내고, 말은 마지막으로 알아낸 언어로 듣습니다' : '');
+    : '무료 번역(Google) · 🎤을 한 번 누르면 계속 듣고, 말을 멈출 때마다 자동으로 통역합니다. 다시 누르면 멈춥니다.' + (CV.partner === 'auto' ? ' 자동 감지는 글로 쓰면 바로 알아내고, 말은 마지막으로 알아낸 언어로 듣습니다.' : '');
   $('cvLayoutBtn').textContent = CV.layout === 'side' ? '⇅ 위아래로' : '⇆ 나란히';
   cvApplyLayout();
 }
@@ -2158,10 +2216,11 @@ function cvApplyLayout(){
   $('cvHist').style.setProperty('--hh', `${CV.histH}px`);
   $('cvHistWrap').hidden = !CV.histOpen;
   $('cvHistToggle').textContent = (CV.histOpen ? '▾' : '▸') + ' 대화 기록';
+  cvFit();
 }
 $('cvLayoutBtn').onclick = () => {
   CV.layout = CV.layout === 'side' ? 'stack' : 'side'; store.set('cv-layout', CV.layout);
-  if (CV.layout === 'stack' && CV.boxH < 420){ CV.boxH = 440; store.set('cv-boxH', CV.boxH); }
+  if (CV.layout === 'stack' && CV.boxH < 280){ CV.boxH = 300; store.set('cv-boxH2', CV.boxH); }
   cvRenderTop();
 };
 function dragger(handle, onMove, onEnd){
@@ -2176,68 +2235,94 @@ dragger($('cvSplit'), e => {
   const v = CV.layout === 'side' ? (e.clientX - r.left) / r.width : (e.clientY - r.top) / r.height;
   CV.ratio = Math.min(.85, Math.max(.15, v)); cvApplyLayout();
 }, () => store.set('cv-ratio', CV.ratio));
-dragger($('cvBoxGrip'), e => {
+dragger($('cvDockGrip'), e => {   // 입력창 위 막대를 위아래로 끌어 높이 조절
   const r = $('cvPanels').getBoundingClientRect();
-  CV.boxH = Math.min(innerHeight * .9, Math.max(160, e.clientY - r.top)); cvApplyLayout();
-}, () => store.set('cv-boxH', CV.boxH));
+  const vh = window.visualViewport ? visualViewport.height : innerHeight;
+  CV.boxH = Math.min(vh * .75, Math.max(130, r.bottom - e.clientY - 40)); cvApplyLayout();
+}, () => store.set('cv-boxH2', CV.boxH));
 dragger($('cvHistGrip'), e => {
   const r = $('cvHist').getBoundingClientRect();
   CV.histH = Math.min(innerHeight * 1.5, Math.max(80, e.clientY - r.top)); cvApplyLayout();
 }, () => store.set('cv-histH', CV.histH));
 $('cvHistToggle').onclick = () => { CV.histOpen = !CV.histOpen; store.set('cv-histOpen', CV.histOpen); cvApplyLayout(); };
 
-/* --- 말하기 (🎤 버튼마다 언어가 정해져 있음) --- */
-let cvRec = null, cvSide = null, cvBase = '', cvIdle = null, cvGotFinal = false;
-const cvTA = side => $(side === 'me' ? 'cvMeText' : 'cvThemText');
+/* --- 말하기: 한 번 누르면 계속 듣고, 말을 멈출 때마다 자동 통역. 다시 누르면 멈춤 --- */
+let cvRec = null, cvSide = null, cvBase = '', cvIdle = null, cvUsed = 0, cvLen = 0, cvTTSPause = false;
 function cvMicUI(){
   document.querySelectorAll('.cv-mic').forEach(b => {
     const on = b.dataset.mic === cvSide;
-    b.classList.toggle('on', on); b.textContent = on ? '■ 멈추고 통역' : '🎤 말하기';
+    b.classList.toggle('on', on); b.textContent = on ? '■ 멈춤' : '🎤 말하기';
   });
   $('cvPanelMe').classList.toggle('listening', cvSide === 'me');
   $('cvPanelThem').classList.toggle('listening', cvSide === 'them');
+  $('cvListen').textContent = !cvSide ? '' : cvTTSPause ? '🔊 읽는 중… 끝나면 다시 듣습니다'
+    : `● ${cvSide === 'me' ? '한국어' : cvL(partner()).name} 듣는 중 — 말을 멈추면 자동 통역`;
 }
-function cvStartMic(side){
-  if (!SR) return toast('이 브라우저에서는 음성 인식을 쓸 수 없습니다. Chrome에서 열어 주세요.');
-  cvStopSpeak();
-  if (cvSide === side){ cvFinish(); return; }
-  if (cvSide) cvFinish();
-  const ta = cvTA(side);
-  cvBase = ta.value.trim(); cvGotFinal = false;
+function cvOpenRec(){
+  if (!cvSide || cvRec) return;
+  const side = cvSide, ta = cvTA(side);
   const r = new SR();
   r.lang = side === 'me' ? 'ko-KR' : cvL(partner()).speech;
   r.continuous = true; r.interimResults = true;
+  cvUsed = 0; cvLen = 0;
   r.onresult = ev => {
+    if (cvRec !== r) return;
+    cvLen = ev.results.length;
     let fin = '', intr = '';
-    for (let k = 0; k < ev.results.length; k++){ const t = ev.results[k][0].transcript; if (ev.results[k].isFinal) fin += t; else intr += t; }
+    for (let k = cvUsed; k < ev.results.length; k++){ const t = ev.results[k][0].transcript; if (ev.results[k].isFinal) fin += t; else intr += t; }
     ta.value = [cvBase, (fin + intr).trim()].filter(Boolean).join(' ');
     clearTimeout(cvIdle);
-    if (fin && !intr){ cvGotFinal = true; cvIdle = setTimeout(cvFinish, 1600); }   // 말이 끝나면 자동 통역
+    if (fin.trim() && !intr.trim()) cvIdle = setTimeout(() => cvSendNow(side), 1400);   // 말이 끝나면 자동 통역
   };
-  r.onerror = ev => { if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') toast('마이크 사용을 허용해 주세요.'); };
-  r.onend = () => { if (cvRec === r) cvFinish(); };
-  cvRec = r; cvSide = side; cvFocusOn();
+  r.onerror = ev => {
+    if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed'){ toast('마이크 사용을 허용해 주세요.'); cvStopMic(false); }
+  };
+  r.onend = () => {
+    if (cvRec !== r) return;
+    cvRec = null;
+    if (!cvSide || cvTTSPause) return;
+    if (cvTA(cvSide).value.trim() && cvTA(cvSide).value.trim() !== cvBase) cvSendNow(cvSide);
+    setTimeout(() => { if (cvSide && !cvRec && !cvTTSPause) cvOpenRec(); }, 250);   // 조용해서 끊겨도 계속 듣기
+  };
+  cvRec = r;
   try{ r.start(); }catch(e){}
-  cvMicUI();
+}
+function cvCloseRec(){
+  const r = cvRec; cvRec = null; clearTimeout(cvIdle);
+  if (r){ r.onresult = r.onend = r.onerror = null; try{ r.abort(); }catch(e){} }   // 늦게 오는 결과는 버림
+}
+function cvStartMic(side){
+  if (!SR) return toast('이 브라우저에서는 음성 인식을 쓸 수 없습니다. Chrome에서 열어 주세요.');
+  if (cvSide === side){ cvStopMic(true); return; }   // 다시 누르면 멈춤 (남은 말은 통역)
+  cvStopSpeak(true);
+  if (cvSide) cvStopMic(true);
+  cvSide = side; cvBase = cvTA(side).value.trim();
+  cvFocusOn(); cvOpenRec(); cvMicUI();
 }
 function cvStopMic(submit){
-  const side = cvSide, r = cvRec;
-  cvRec = null; cvSide = null; clearTimeout(cvIdle);
-  if (r){ try{ r.onend = null; r.stop(); }catch(e){} }
-  cvMicUI();
-  return side;
+  const side = cvSide;
+  cvSide = null; cvTTSPause = false;
+  cvCloseRec();
+  if (submit && side && cvTA(side).value.trim()) cvSubmit(side);
+  cvBase = ''; cvMicUI(); cvFocusOff();
 }
-function cvFinish(){
-  const side = cvStopMic(true);
-  if (side && cvTA(side).value.trim()) cvSubmit(side, true);
-  cvFocusOff();
+function cvSendNow(side){   // 지금까지 들은 말을 통역하고 계속 듣기
+  clearTimeout(cvIdle);
+  if (cvTA(side).value.trim()) cvSubmit(side);
+  if (cvSide === side){ cvBase = ''; cvUsed = cvLen; }
 }
 document.querySelectorAll('.cv-mic').forEach(b => b.onclick = () => cvStartMic(b.dataset.mic));
-document.querySelectorAll('.cv-go').forEach(b => b.onclick = () => { if (cvSide === b.dataset.go) cvStopMic(); cvSubmit(b.dataset.go, false); });
-document.querySelectorAll('.cv-x').forEach(b => b.onclick = () => { if (cvSide === b.dataset.clear) cvStopMic(); cvTA(b.dataset.clear).value = ''; cvTA(b.dataset.clear).focus(); });
-['cvMeText', 'cvThemText'].forEach(id => $(id).addEventListener('keydown', ev => {
-  if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing){ ev.preventDefault(); cvSubmit(id === 'cvMeText' ? 'me' : 'them', false); }
-}));
+document.querySelectorAll('.cv-go').forEach(b => b.onclick = () => cvSendNow(b.dataset.go));
+document.querySelectorAll('.cv-x').forEach(b => b.onclick = () => {
+  const side = b.dataset.clear; cvTA(side).value = '';
+  if (cvSide === side){ cvBase = ''; cvUsed = cvLen; clearTimeout(cvIdle); }   // 지운 말이 다시 나타나지 않게
+  cvTA(side).focus();
+});
+['cvMeText', 'cvThemText'].forEach(id => {
+  const side = id === 'cvMeText' ? 'me' : 'them';
+  $(id).addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing){ ev.preventDefault(); cvSendNow(side); } });
+  $(id).addEventListener('input', ev => { if (cvSide === side && ev.isTrusted){ cvBase = $(id).value.trim(); cvUsed = cvLen; } });   // 듣는 중에 손으로 고친 글 유지
+});
 
 /* --- 통역 --- */
 async function cvGoogle(text, sl, tl){
@@ -2247,12 +2332,13 @@ async function cvGoogle(text, sl, tl){
   return {text: j[0].map(x => x[0]).join('').trim(), detected: j[2]};
 }
 const toCode = g => { if (!g) return null; g = g.toLowerCase(); if (g.startsWith('zh')) return 'zh'; return ['ko', 'en', 'fr', 'es', 'ja'].includes(g.slice(0, 2)) ? g.slice(0, 2) : null; };
-function cvSubmit(side, spoken){
+function cvSubmit(side){
   const ta = cvTA(side), text = ta.value.trim();
   if (!text) return;
   ta.value = '';
-  const turn = {id: Date.now() + Math.random(), t: Date.now(), side, lang: side === 'me' ? 'ko' : partner(), text, tr: null, trLang: side === 'me' ? partner() : 'ko', spoken, auto: side === 'them' && CV.partner === 'auto'};
-  CV.turns.push(turn); cvSave(); cvRenderAll();
+  const turn = {id: Date.now() + Math.random(), t: Date.now(), side, lang: side === 'me' ? 'ko' : partner(), text, tr: null,
+    trLang: side === 'me' ? partner() : 'ko', auto: side === 'them' && CV.partner === 'auto'};
+  CV.turns.push(turn); cvSave(); cvRenderAll(true);
   cvTranslate(turn);
 }
 async function cvTranslate(turn){
@@ -2283,16 +2369,12 @@ Return ONLY JSON: {"fixed": "...", "tr": "..."}` : `Return ONLY JSON: {"tr": "..
   if (!done){
     try{
       const sl = turn.side === 'me' ? 'ko' : (turn.auto ? 'auto' : cvL(turn.lang).g);
-      const tl = turn.side === 'me' ? cvL(partner()).g : 'ko';
+      const tl = turn.side === 'me' ? cvL(turn.trLang).g : 'ko';
       const r = await cvGoogle(turn.text, sl, tl);
       turn.tr = r.text; turn.eng = 'google';
-      if (turn.side === 'them' && turn.auto){
-        const c = toCode(r.detected);
-        if (c && c !== 'ko'){ turn.lang = c; cvSetDetected(c); }
-      }
+      if (turn.side === 'them' && turn.auto){ const c = toCode(r.detected); if (c && c !== 'ko'){ turn.lang = c; cvSetDetected(c); } }
     }catch(e){ turn.tr = ''; turn.fail = true; }
   }
-  turn.trLang = turn.side === 'me' ? partner() : 'ko';
   cvSave(); cvRenderAll(); cvRenderTop();
   if (CV.speak && turn.tr) cvSpeakTurn(turn);
 }
@@ -2302,55 +2384,73 @@ function cvSetDetected(c){
   toast(`상대 언어를 ${cvL(c).name}로 알아냈습니다. 🎤도 이제 ${cvL(c).name}로 듣습니다.`);
 }
 
-/* --- 소리 내어 읽기 (읽는 중 다시 누르면 멈춤) --- */
+/* --- 소리 내어 읽기 (읽는 동안은 마이크를 잠시 쉼, 다시 누르면 멈춤) --- */
 let cvSpeaking = null;
-function cvStopSpeak(){ if (cvSpeaking){ cvSpeaking = null; try{ speechSynthesis.cancel(); }catch(e){} cvSayUI(); } }
+function cvStopSpeak(noResume){
+  const was = cvSpeaking; cvSpeaking = null;
+  if (was) try{ speechSynthesis.cancel(); }catch(e){}
+  if (cvTTSPause){ cvTTSPause = false; if (!noResume && cvSide) cvOpenRec(); }
+  cvSayUI(); cvMicUI();
+}
 function cvSpeakTurn(turn){
   if (!('speechSynthesis' in window) || !turn.tr) return;
-  if (cvSide) return;   // 듣는 중에는 읽지 않음 (다시 받아 적히지 않게)
   speechSynthesis.cancel();
+  if (cvSide){ cvTTSPause = true; cvCloseRec(); }   // 읽는 소리가 다시 받아 적히지 않게
   const l = cvL(turn.trLang);
   const u = new SpeechSynthesisUtterance(turn.tr);
   u.lang = l.tts; const v = voiceFor(l.tts); if (v) u.voice = v;
-  u.onend = u.onerror = () => { if (cvSpeaking === turn.id){ cvSpeaking = null; cvSayUI(); } };
-  cvSpeaking = turn.id; cvSayUI();
+  u.onend = u.onerror = () => { if (cvSpeaking === turn.id) cvStopSpeak(); };
+  cvSpeaking = turn.id; cvSayUI(); cvMicUI();
   speechSynthesis.speak(u);
 }
-function cvSayUI(){ document.querySelectorAll('.cv-say').forEach(b => { const on = +b.dataset.id === cvSpeaking; b.classList.toggle('on', on); b.textContent = on ? '■' : '🔊'; b.title = on ? '읽기 멈춤' : '소리 내어 읽기'; }); }
+function cvSayUI(){ document.querySelectorAll('.cv-say, .cv-say-mini').forEach(b => { const on = +b.dataset.id === cvSpeaking; b.classList.toggle('on', on); b.textContent = on ? '■' : '🔊'; b.title = on ? '읽기 멈춤' : '소리 내어 읽기'; }); }
+
+/* --- 글 길이에 맞춰 글씨 크기 --- */
+function cvFontSize(text){
+  const n = [...(text || '')].length;
+  const base = n <= 12 ? 40 : n <= 25 ? 34 : n <= 50 ? 29 : n <= 90 ? 25 : n <= 160 ? 21 : n <= 280 ? 18 : 16;
+  const scale = Math.min(1, Math.max(.6, innerWidth / 900));
+  return Math.round(Math.max(15, base * scale));
+}
 
 /* --- 화면 그리기 --- */
-function cvCurrent(){
-  const n = CV.turns.length; if (!n) return [];
-  const last = CV.turns[n - 1], prev = CV.turns[n - 2];
-  return prev && prev.side !== last.side ? [prev, last] : [last];
-}
-function cvCard(turn){
-  const d = document.createElement('div'); d.className = 'cv-card ' + turn.side;
+function cvBubble(turn, old){
+  const d = document.createElement('div'); d.className = 'cv-b ' + turn.side + (old ? ' old' : '');
   const src = turn.side === 'me' ? KO : cvL(turn.lang), dst = cvL(turn.trLang);
+  const tfs = cvFontSize(turn.tr || turn.text);
+  d.style.setProperty('--tfs', tfs + 'px');
+  d.style.setProperty('--ofs', Math.max(13, Math.round(tfs * .55)) + 'px');
   const o = document.createElement('div'); o.className = 'cv-o';
-  o.innerHTML = `${flagImg(src.flag)} <span></span>`; o.querySelector('span').textContent = turn.text;
-  if (turn.pol){ const p = document.createElement('span'); p.className = 'pol'; p.textContent = '✨ 다듬음'; p.style.cssText = 'font-size:.75em;color:#9a6b12;background:#fff4dc;border:1px solid #f0d9a8;border-radius:6px;padding:0 5px'; o.append(p); }
+  o.innerHTML = flagImg(src.flag); o.append(document.createTextNode(turn.text));
+  if (turn.pol){ const p = document.createElement('span'); p.className = 'pol'; p.textContent = '✨ 다듬음'; o.append(p); }
   const t = document.createElement('div'); t.className = 'cv-t' + (turn.tr == null ? ' wait' : '');
-  t.innerHTML = turn.tr == null ? '통역 중…' : (turn.fail ? '번역하지 못했습니다' : `${flagImg(dst.flag)} `);
-  if (turn.tr) t.append(document.createTextNode(turn.tr));
-  d.append(o, t);
-  if (turn.pol && turn.raw){ const r = document.createElement('div'); r.className = 'cv-raw'; r.textContent = '🎧 들은 그대로: ' + turn.raw; d.append(r); }
+  if (turn.tr == null) t.textContent = '통역 중…';
+  else if (turn.fail) t.textContent = '번역하지 못했습니다';
+  else { t.innerHTML = flagImg(dst.flag); t.append(document.createTextNode(turn.tr)); }
   if (turn.tr){
     const s = document.createElement('button'); s.className = 'cv-say'; s.dataset.id = turn.id;
     s.onclick = () => cvSpeaking === turn.id ? cvStopSpeak() : cvSpeakTurn(turn);
-    d.append(s);
+    t.append(s);
   }
+  d.append(o, t);
+  if (turn.pol && turn.raw){ const r = document.createElement('div'); r.className = 'cv-raw'; r.textContent = '🎧 들은 그대로: ' + turn.raw; d.append(r); }
   return d;
 }
+function cvRenderStream(){
+  const box = $('cvStream');
+  [...box.querySelectorAll('.cv-b')].forEach(n => n.remove());
+  const list = CV.turns.slice(-STREAM_N);
+  $('cvEmpty').hidden = list.length > 0;
+  const lastPair = 2;
+  list.forEach((t, k) => box.append(cvBubble(t, k < list.length - lastPair)));
+  box.scrollTop = box.scrollHeight;   // 새 대화가 아래에서 나오고, 지난 것은 위로 올라감
+}
 function cvRenderAll(){
-  const now = cvCurrent();
-  const box = $('cvNow'); box.innerHTML = '';
-  now.forEach(t => box.append(cvCard(t)));
+  cvRenderStream();
   const hist = $('cvHist'); const stick = hist.scrollHeight - hist.scrollTop - hist.clientHeight < 40;
   hist.innerHTML = '';
-  const past = CV.turns.filter(t => !now.includes(t));
-  if (!past.length) hist.innerHTML = '<p class="hint" style="padding:10px 0">지난 대화가 여기에 순서대로 쌓입니다.</p>';
-  past.forEach(turn => {
+  if (!CV.turns.length) hist.innerHTML = '<p class="hint" style="padding:10px 0">주고받은 대화가 여기에 모두 순서대로 남습니다.</p>';
+  CV.turns.forEach(turn => {
     const row = document.createElement('div'); row.className = 'cv-h ' + turn.side;
     const tm = document.createElement('div'); tm.className = 'tm'; tm.textContent = hms(turn.t).slice(0, 5);
     const b = document.createElement('div');
@@ -2359,19 +2459,20 @@ function cvRenderAll(){
     b.querySelector('.o span').textContent = turn.text + (turn.pol ? ' ✨' : '');
     b.querySelector('.t span').textContent = turn.tr || (turn.fail ? '번역하지 못했습니다' : '…');
     const acts = document.createElement('div'); acts.className = 'acts';
-    const say = document.createElement('button'); say.className = 'cv-say-mini'; say.textContent = '🔊'; say.title = '소리 내어 읽기';
+    const say = document.createElement('button'); say.className = 'cv-say-mini'; say.dataset.id = turn.id; say.textContent = '🔊'; say.title = '소리 내어 읽기';
     say.onclick = () => cvSpeaking === turn.id ? cvStopSpeak() : cvSpeakTurn(turn);
     const del = document.createElement('button'); del.textContent = '✕'; del.title = '이 대화 지우기';
     del.onclick = () => {
       if (!del.classList.contains('sure')){ del.classList.add('sure'); del.textContent = '지우기?'; setTimeout(() => { del.classList.remove('sure'); del.textContent = '✕'; }, 3000); return; }
+      if (cvSpeaking === turn.id) cvStopSpeak();
       CV.turns = CV.turns.filter(x => x !== turn); cvSave(); cvRenderAll();
     };
     acts.append(say, del);
     row.append(tm, b, acts); hist.append(row);
   });
   if (stick) hist.scrollTop = hist.scrollHeight;
-  $('cvHistCount').textContent = CV.turns.length ? `${past.length}개 · 모두 ${CV.turns.length}개` : '';
-  cvSayUI();
+  $('cvHistCount').textContent = CV.turns.length ? `${CV.turns.length}개` : '';
+  cvSayUI(); cvFit();
 }
 $('cvCopy').onclick = () => {
   const tm = $('withTime').checked;
