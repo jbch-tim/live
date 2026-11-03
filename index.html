@@ -214,6 +214,11 @@
   .cv-b .pol{font-size:.72em;color:#9a6b12;background:#fff4dc;border:1px solid #f0d9a8;border-radius:6px;padding:0 5px;margin-left:4px}
   .cv-say{position:absolute;top:50%;right:8px;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;padding:0;font-size:18px;background:rgba(255,255,255,.8)}
   .cv-say.on{background:var(--red);color:#fff;border-color:var(--red);animation:blink 1.2s infinite}
+  .cv-toptog{width:100%;display:flex;align-items:center;gap:8px;border:none;background:transparent;padding:2px 0;font-weight:600;text-align:left}
+  .cv-toptog:hover{filter:none;color:var(--accent)}
+  .cv-toptog .flag{width:22px;height:16px}
+  .cv-toptog .arr{margin-left:auto;color:var(--muted);font-weight:400;font-size:.9em}
+  #cvTopBody{margin-top:10px}
   .cv-b.old{opacity:.55}
   .cv-b.old:hover{opacity:1}
   .cv-del{border:none;background:transparent;color:#9ca3af;font-size:12px;padding:1px 6px;margin-left:6px;border-radius:6px;vertical-align:1px}
@@ -459,6 +464,8 @@
 <!-- ===================== 대화 모드 ===================== -->
 <div id="convMode" hidden>
   <section class="card cv-top" id="cvTop">
+    <button id="cvTopToggle" class="cv-toptog"></button>
+    <div id="cvTopBody">
     <div class="row" style="margin-bottom:10px">
       <span class="lbl">상대 언어</span>
       <span id="cvLangs" class="row" style="gap:6px"></span>
@@ -467,6 +474,7 @@
       <label class="switch"><input type="checkbox" id="cvClaude"><span class="track"></span><span>Claude 실시간 번역</span></label>
       <label class="switch"><input type="checkbox" id="cvSpeak"><span class="track"></span><span>🔊 소리 내어 읽기</span></label>
       <span id="cvNote" class="hint" style="flex-basis:100%"></span>
+    </div>
     </div>
   </section>
 
@@ -2105,6 +2113,15 @@ const CVL = [
   {c: 'es', flag: 'es', name: 'Español',  speech: 'es-ES', tts: 'es-ES', g: 'es', en: 'Spanish'},
   {c: 'ja', flag: 'jp', name: '日本語',   speech: 'ja-JP', tts: 'ja-JP', g: 'ja', en: 'Japanese'},
 ];
+const UI = {
+  ko: {mic: '🎤 말하기', stop: '■ 멈춤', go: '➤ 통역', listen: '듣는 중 — 말을 멈추면 자동 통역', clear: '입력칸 비우기'},
+  en: {mic: '🎤 Speak', stop: '■ Stop', go: '➤ Translate', listen: 'Listening — translates when you pause', clear: 'Clear'},
+  fr: {mic: '🎤 Parler', stop: '■ Arrêter', go: '➤ Traduire', listen: 'J’écoute — je traduis dès que vous faites une pause', clear: 'Effacer'},
+  zh: {mic: '🎤 说话', stop: '■ 停止', go: '➤ 翻译', listen: '正在听 — 停顿后自动翻译', clear: '清除'},
+  es: {mic: '🎤 Hablar', stop: '■ Detener', go: '➤ Traducir', listen: 'Escuchando — traduce cuando hace una pausa', clear: 'Borrar'},
+  ja: {mic: '🎤 話す', stop: '■ 停止', go: '➤ 翻訳', listen: '聞いています — 話し終えると自動で翻訳します', clear: '消去'},
+};
+const uiOf = side => UI[side === 'me' ? 'ko' : partner()] || UI.en;
 const KO = {c: 'ko', flag: 'kr', name: '한국어', speech: 'ko-KR', tts: 'ko-KR', g: 'ko', en: 'Korean'};
 const cvL = c => c === 'ko' ? KO : (CVL.find(x => x.c === c) || CVL[0]);
 const CV = {
@@ -2195,12 +2212,22 @@ function cvLangChanged(){
   cvRenderTop();
   if (cvSide === 'them'){ cvCloseRec(); cvOpenRec(); }   // 듣는 중이면 새 언어로 다시 듣기
 }
+CV.topOpen = store.get('cv-topOpen', true);
+$('cvTopToggle').onclick = () => { CV.topOpen = !CV.topOpen; store.set('cv-topOpen', CV.topOpen); cvRenderTop(); };
 function cvRenderTop(){
   cvRenderLangs();
+  const pl = cvL(partner());
+  $('cvTopBody').hidden = !CV.topOpen;
+  $('cvTopToggle').innerHTML = `🌐 상대 언어: ${flagImg(pl.flag)} ${pl.name}${CV.partner === 'auto' ? ' (자동)' : ''}`
+    + ` <span class="hint" style="font-weight:400">· ${CV.claude ? 'Claude 번역' : '무료 번역'} · 🔊 ${CV.speak ? '읽기 켬' : '읽기 끔'}</span>`
+    + `<span class="arr">${CV.topOpen ? '▴ 닫기' : '▾ 열기'}</span>`;
   const p = cvL(partner());
   $('cvMeLabel').innerHTML = `${flagImg('kr')} 한국어 <span class="hint" style="font-weight:400">→ ${p.name}</span>`;
   $('cvThemLabel').innerHTML = `${flagImg(p.flag)} ${p.name}${CV.partner === 'auto' ? ' <span class="hint" style="font-weight:400">(자동)</span>' : ''} <span class="hint" style="font-weight:400">→ 한국어</span>`;
   $('cvThemText').placeholder = {en: 'Speak or type here', fr: 'Parlez ou écrivez ici', zh: '请在这里说话或输入', es: 'Hable o escriba aquí', ja: 'ここで話すか入力してください'}[p.c] || '';
+  document.querySelectorAll('.cv-go').forEach(b => b.textContent = uiOf(b.dataset.go).go);
+  document.querySelectorAll('.cv-x').forEach(b => b.title = uiOf(b.dataset.clear).clear);
+  cvMicUI();
   $('cvClaude').checked = CV.claude; $('cvSpeak').checked = CV.speak;
   $('cvNote').innerHTML = CV.claude
     ? (S.key ? `<span class="cost">Claude로 번역하고, 내 한국어도 다듬습니다 · 이번 기록 ${usd(ses.usage.usd)}</span>` : '<span style="color:var(--red)">Anthropic API 키가 없습니다. ⚙️ 설정에서 넣어 주세요. (그동안은 무료 번역)</span>')
@@ -2209,7 +2236,7 @@ function cvRenderTop(){
   cvApplyLayout();
 }
 $('cvClaude').onchange = () => { CV.claude = $('cvClaude').checked; store.set('cv-claude', CV.claude); cvRenderTop(); if (CV.claude && !S.key){ $('setPanel').hidden = false; $('apiKey').focus(); } };
-$('cvSpeak').onchange = () => { CV.speak = $('cvSpeak').checked; store.set('cv-speak', CV.speak); if (!CV.speak) cvStopSpeak(); };
+$('cvSpeak').onchange = () => { CV.speak = $('cvSpeak').checked; store.set('cv-speak', CV.speak); if (!CV.speak) cvStopSpeak(); cvRenderTop(); };
 
 /* --- 배치와 크기 --- */
 function cvApplyLayout(){
@@ -2255,12 +2282,13 @@ let cvRec = null, cvSide = null, cvBase = '', cvIdle = null, cvUsed = 0, cvLen =
 function cvMicUI(){
   document.querySelectorAll('.cv-mic').forEach(b => {
     const on = b.dataset.mic === cvSide;
-    b.classList.toggle('on', on); b.textContent = on ? '■ 멈춤' : '🎤 말하기';
+    const u = uiOf(b.dataset.mic);
+    b.classList.toggle('on', on); b.textContent = on ? u.stop : u.mic;
   });
   $('cvPanelMe').classList.toggle('listening', cvSide === 'me');
   $('cvPanelThem').classList.toggle('listening', cvSide === 'them');
   $('cvListen').textContent = !cvSide ? '' : cvTTSPause ? '🔊 읽는 중… 끝나면 다시 듣습니다'
-    : `● ${cvSide === 'me' ? '한국어' : cvL(partner()).name} 듣는 중 — 말을 멈추면 자동 통역`;
+    : `● ${cvSide === 'me' ? '한국어' : cvL(partner()).name} · ${uiOf(cvSide).listen}`;
 }
 function cvOpenRec(){
   if (!cvSide || cvRec) return;
