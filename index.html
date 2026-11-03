@@ -149,6 +149,20 @@
   .readbar button{padding:5px 11px;display:inline-flex;align-items:center;gap:6px}
   .readbar button.on{border-color:var(--accent);background:#eef4fb;font-weight:700}
   .ent.reading{background:#fff7d6;border-radius:8px;box-shadow:0 0 0 6px #fff7d6}
+  .ent .o .pol{display:inline-block;margin-left:6px;font-size:.68em;color:#9a6b12;background:#fff4dc;border:1px solid #f0d9a8;border-radius:6px;padding:0 6px;vertical-align:middle;cursor:help}
+  .ent .raw{font-size:.78em;color:var(--muted);margin-top:2px}
+  body.v-tr .ent .raw{display:none}
+  .polishbtn{background:#fff;color:#9a6b12;border:1px solid #f0d9a8;padding:7px 12px}
+  .polishbtn:hover{background:#fff4dc;filter:none}
+  .spk .go{margin-left:6px;padding:3px 10px;font-size:.85em;border-radius:999px;border:1px solid var(--red);color:var(--red);background:#fff;font-weight:600}
+  .spk .go:hover{background:#fdf0ee;filter:none}
+  .spk .live{margin-left:6px;font-size:.8em;color:var(--red);font-weight:700}
+  .spk.upc{background:#fafafa;border-style:dashed;border-color:#d6d0c4;cursor:grab}
+  .spk.upc b{color:var(--muted)}
+  .spk.dragover,.pwrap.dragover .pchip{outline:2px dashed var(--accent);outline-offset:2px}
+  .spk .nm.click{cursor:pointer;border-bottom-style:solid}
+  .spk .nm.click:hover{color:var(--red)}
+  .pchip{cursor:grab}
   .warnbox{background:#fff4e5;border:1px solid #f5d0a0;border-radius:12px;padding:10px 14px;font-size:.88em;margin-bottom:14px}
   @media (max-width:640px){ .lbl{min-width:0;width:100%} }
 </style>
@@ -235,6 +249,7 @@
     <div class="row" style="margin-bottom:12px">
       <span class="lbl">번역 방식</span>
       <label class="switch"><input type="checkbox" id="claudeOn"><span class="track"></span><span>Claude 실시간 번역</span></label>
+      <label id="polishWrap" class="chk" title="앞 문맥을 보고 잘못 알아들은 말을 바로잡습니다. 들은 그대로의 말도 함께 남깁니다."><input type="checkbox" id="polishOn"> ✨ 문장 다듬기</label>
       <span id="engineNote" class="hint"></span>
     </div>
     <div class="row" style="margin-bottom:12px">
@@ -257,6 +272,7 @@
       <button data-v="or">원문만</button>
     </div>
     <button id="clearBtn" class="clearbtn" title="지금 화면의 기록을 모두 지웁니다">🗑 지우기</button>
+    <button id="polishAll" class="polishbtn" title="앞뒤 문맥을 모두 보고 전체 문장을 다시 다듬고 번역합니다 (Claude)">✨ 전체 다듬기</button>
     <span id="countInfo" class="hint" style="margin-left:auto"></span>
   </div>
   <div class="readbar" id="readBar">
@@ -270,7 +286,7 @@
       <option value="0.8">천천히</option><option value="1" selected>보통 빠르기</option><option value="1.2">조금 빠르게</option>
     </select>
   </div>
-  <div id="log"><div class="empty" id="emptyMsg">"듣기 시작"을 누르고 말씀을 시작하면 여기에 받아 적고 번역합니다.</div><div class="interim" id="interim"></div></div>
+  <div id="log"><div class="empty" id="emptyMsg">"듣기 시작"을 누르고 말씀을 시작하면 여기에 받아 적고 번역합니다.</div><div class="interim" id="interim"></div><div id="upcoming"></div></div>
 
   <!-- 끝난 뒤 -->
   <section class="card bar" style="margin-top:14px">
@@ -457,6 +473,7 @@ function renderExLang(){
 
 function renderEngine(){
   $('claudeOn').checked = S.claude;
+  $('polishOn').checked = S.polish; $('polishWrap').hidden = !S.claude; $('polishWrap').classList.toggle('on', S.polish);
   if (S.claude){
     const u = ses.usage;
     $('engineNote').innerHTML = S.key
@@ -468,6 +485,37 @@ function renderEngine(){
 }
 
 /* ---------- 기록 표시 ---------- */
+function moveSpeaker(fromId, toId){
+  const r = roster(), a = r.findIndex(x => x.id === fromId), b = r.findIndex(x => x.id === toId);
+  if (a < 0 || b < 0 || a === b) return;
+  const [m] = r.splice(a, 1); r.splice(b, 0, m);
+  saveNow(); renderRoster(); renderUpcoming();
+}
+function makeDraggable(el, id){
+  el.draggable = true;
+  el.addEventListener('dragstart', ev => { ev.dataTransfer.setData('text/plain', String(id)); ev.dataTransfer.effectAllowed = 'move'; });
+  el.addEventListener('dragover', ev => { ev.preventDefault(); el.classList.add('dragover'); });
+  el.addEventListener('dragleave', () => el.classList.remove('dragover'));
+  el.addEventListener('drop', ev => { ev.preventDefault(); el.classList.remove('dragover'); moveSpeaker(+ev.dataTransfer.getData('text/plain'), id); });
+}
+function renderUpcoming(){
+  const box = $('upcoming'); if (!box) return;
+  box.innerHTML = '';
+  const spoken = new Set(ses.entries.filter(e => e.div && e.spk).map(e => e.spk));
+  let n = ses.entries.filter(e => e.div).length;
+  roster().filter(p => !spoken.has(p.id)).forEach(p => {
+    n++;
+    const d = document.createElement('div'); d.className = 'spk upc'; d.title = '끌어서 순서를 바꿀 수 있습니다';
+    d.innerHTML = `<span>⋮⋮</span><b>${n}번째 순서</b>`;
+    const nm = document.createElement('span'); nm.className = 'nm click'; nm.textContent = p.name || '(이름 없음)';
+    nm.title = '누르면 이 사람 차례로 마이크가 켜집니다'; nm.onclick = () => selectSpeaker(p);
+    const go = document.createElement('button'); go.className = 'go'; go.textContent = '🎙 이 사람 말하기'; go.onclick = () => selectSpeaker(p);
+    const meta = document.createElement('span'); meta.className = 'meta'; meta.innerHTML = `차례 기다림 · ${flagImg(speechOf(p.lang).flag)} ${speechOf(p.lang).name}`;
+    d.append(nm, go, meta);
+    makeDraggable(d, p.id);
+    box.append(d);
+  });
+}
 function delBtn(i, what){
   const b = document.createElement('button'); b.className = 'del'; b.textContent = '✕'; b.title = what + ' 지우기';
   b.onclick = () => {
@@ -488,18 +536,36 @@ function entryEl(e, i){
   if (e.div){
     const d = document.createElement('div'); d.className = 'spk ent-like'; d.dataset.i = i;
     d.innerHTML = `<span>👤</span><b>${spkNo(i)}번째 순서</b>`;
-    const nm = document.createElement('span'); nm.className = 'nm'; nm.contentEditable = 'true'; nm.title = '눌러서 이름 고치기';
-    nm.textContent = e.name || ''; nm.dataset.ph = '이름';
-    nm.onblur = () => { e.name = nm.textContent.trim(); saveSoon(); };
-    nm.onkeydown = ev => { if (ev.key === 'Enter'){ ev.preventDefault(); nm.blur(); } };
+    const p = e.spk && roster().find(x => x.id === e.spk);
+    const nm = document.createElement('span'); nm.className = 'nm';
+    nm.textContent = e.name || (p && p.name) || '';
+    const extra = [];
+    if (p){
+      nm.classList.add('click'); nm.title = '누르면 이 사람 차례로 마이크가 켜집니다';
+      nm.onclick = () => selectSpeaker(p);
+      const lastDiv = ses.entries.map(x => x.div).lastIndexOf(true) === i;
+      if (lastDiv && ses.active === p.id && want){ const lv = document.createElement('span'); lv.className = 'live'; lv.textContent = '● 듣는 중'; extra.push(lv); }
+      else { const go = document.createElement('button'); go.className = 'go'; go.textContent = '🎙 이 사람 말하기'; go.onclick = () => selectSpeaker(p); extra.push(go); }
+    } else {
+      nm.contentEditable = 'true'; nm.title = '눌러서 이름 고치기';
+      nm.onblur = () => { e.name = nm.textContent.trim(); saveSoon(); };
+      nm.onkeydown = ev => { if (ev.key === 'Enter'){ ev.preventDefault(); nm.blur(); } };
+    }
     const meta = document.createElement('span'); meta.className = 'meta'; meta.innerHTML = `${hms(e.t)} · ${flagImg(L(e.src).flag)} ${L(e.src).name}`;
-    d.append(nm, meta, delBtn(i, '이 순서 표시')); return d;
+    d.append(nm, ...extra, meta, delBtn(i, '이 순서 표시')); return d;
   }
   const d = document.createElement('div'); d.className = 'ent'; d.dataset.i = i;
   const tm = document.createElement('div'); tm.className = 'tm'; tm.textContent = hms(e.t);
   const b = document.createElement('div'); b.className = 'body';
   const o = document.createElement('div'); o.className = 'o'; o.textContent = e.text;
   b.append(o);
+  if (e.pol && e.raw){
+    const badge = document.createElement('span'); badge.className = 'pol'; badge.textContent = '✨ 다듬음';
+    badge.title = '앞뒤 문맥을 보고 잘못 알아들은 말을 바로잡은 문장입니다. 아래는 들은 그대로입니다.';
+    o.append(badge);
+    const raw = document.createElement('div'); raw.className = 'raw'; raw.textContent = '🎧 들은 그대로: ' + e.raw;
+    b.append(raw);
+  }
   const langs = LANGS.map(l => l.code).filter(c => S.targets.includes(c) && (c in (e.tr || {}) || (e.pend || []).includes(c) || (e.fail || []).includes(c)));
   langs.forEach(c => {
     const t = document.createElement('div');
@@ -521,11 +587,12 @@ function nearBottom(){ const g = $('log'); return g.scrollHeight - g.scrollTop -
 function scrollEnd(){ const g = $('log'); g.scrollTop = g.scrollHeight; }
 function renderAll(){
   const g = $('log');
-  [...g.querySelectorAll('.ent,.spk')].forEach(n => n.remove());
+  [...g.querySelectorAll(':scope > .ent, :scope > .spk')].forEach(n => n.remove());
   const frag = document.createDocumentFragment();
   ses.entries.forEach((e, i) => frag.append(entryEl(e, i)));
   g.insertBefore(frag, $('interim'));
-  $('emptyMsg').hidden = ses.entries.length > 0;
+  $('emptyMsg').hidden = ses.entries.length > 0 || roster().length > 0;
+  renderUpcoming();
   scrollEnd(); renderCount(); renderStage(); renderExLang(); renderReadBar(); markReading();
 }
 function updateEntry(i){
@@ -535,6 +602,7 @@ function updateEntry(i){
   const n = entryEl(ses.entries[i], i);
   if (old) old.replaceWith(n); else $('log').insertBefore(n, $('interim'));
   $('emptyMsg').hidden = true;
+  if (ses.entries[i].div) renderUpcoming();
   if (stick) scrollEnd(); else $('jumpBtn').hidden = false;
   renderCount(); renderStage();
   if (!$('readBar').hidden !== !!talk().length || $('readLangs').children.length !== usedLangs().length + 1) renderReadBar();
@@ -799,12 +867,16 @@ function renderRoster(){
       ses.roster = roster().filter(x => x.id !== p.id); if (ses.active === p.id) ses.active = null;
       saveNow(); renderRoster();
     };
+    makeDraggable(w, p.id);
     w.append(b, ed, del); box.append(w);
   });
   const add = document.createElement('button'); add.className = 'pchip addchip'; add.textContent = '+ 사람 추가';
   add.onclick = () => openAdd(null);
   box.append(add);
   $('srcRow').hidden = roster().length > 0;  // 명단이 있으면 언어는 사람마다 정해져 있음
+  renderUpcoming();
+  $('emptyMsg').hidden = ses.entries.length > 0 || roster().length > 0;
+  [...$('log').querySelectorAll(':scope > .spk')].forEach(n => { const k = +n.dataset.i; if (ses.entries[k]) n.replaceWith(entryEl(ses.entries[k], k)); });
 }
 function renderNewFlags(){
   $('newFlags').innerHTML = '';
@@ -894,8 +966,13 @@ function pump(){
 async function translateEntry(e){
   if (ses.entries.indexOf(e) < 0) return;
   const langs = [...(e.pend || [])];
-  if (!langs.length) return;
   const sc = e.src || srcCode(ses.src || S.src);
+  if (!langs.length){
+    if (!(polishOn() && !e.polDone)) return;
+    try{ await claudeTranslate(e, sc, []); }catch(err){ e.polDone = true; }
+    const i = ses.entries.indexOf(e); if (i >= 0){ updateEntry(i); saveSoon(); }
+    return;
+  }
   let done = false;
   if (S.claude && S.key){
     try{
@@ -905,7 +982,7 @@ async function translateEntry(e){
       done = langs.every(c => e.tr[c] != null);
     }catch(err){
       console.warn('Claude 번역 실패, Google로 대신합니다', err);
-      if (err.user) toast(err.user);
+      if (err.user) toast(err.user + ' (Google 번역으로 대신했습니다)');
     }
   }
   if (!done){
@@ -961,27 +1038,20 @@ Rules:
 - Keep God/Jesus terms reverent and consistent (e.g. Korean 하나님, 예수님).
 Return ONLY a JSON object with exactly these keys: ${langs.map(c => `"${c}"`).join(', ')}. Each value is the translation string. No other text.`;
 }
-async function claudeTranslate(e, sc, langs){
-  const i = ses.entries.indexOf(e);
-  const before = [];
-  for (let k = i - 1; k >= 0 && before.length < 4; k--){ if (ses.entries[k].div) break; before.unshift(ses.entries[k].text); }
-  const prev = before.join('\n');
-  const user = (prev ? `Earlier context (do NOT translate, for reference only):\n${prev}\n\n` : '') + `Segment to translate:\n${e.text}`;
-  const body = {model: MODEL, max_tokens: 1500, system: systemPrompt(sc, langs), messages: [{role: 'user', content: user}]};
+async function claudeJSON(system, user, maxTokens = 1500, open = '{', close = '}'){
+  const body = {model: MODEL, max_tokens: maxTokens, system, messages: [{role: 'user', content: user}]};
   if (!noThinkingParam) body.thinking = {type: 'disabled'};
   let r = await callClaude(body);
   if (r.status === 400 && !noThinkingParam){
     const msg = await r.clone().text();
     if (/thinking/i.test(msg)){ noThinkingParam = true; store.set('lv-noThink', true); delete body.thinking; r = await callClaude(body); }
   }
-  if (r.status === 429 || r.status === 529 || r.status >= 500){
-    await new Promise(z => setTimeout(z, 1500)); r = await callClaude(body);
-  }
+  if (r.status === 429 || r.status === 529 || r.status >= 500){ await new Promise(z => setTimeout(z, 1500)); r = await callClaude(body); }
   if (!r.ok){
     const err = new Error('claude ' + r.status);
-    if (r.status === 401) err.user = 'API 키가 맞지 않습니다. ⚙️ 설정에서 확인해 주세요. (Google 번역으로 대신했습니다)';
-    else if (r.status === 403 || r.status === 402) err.user = 'Anthropic 계정의 사용 한도나 결제를 확인해 주세요. (Google 번역으로 대신했습니다)';
-    else if (r.status === 429) err.user = 'Claude 요청이 많아 잠시 Google 번역으로 대신합니다.';
+    if (r.status === 401) err.user = 'API 키가 맞지 않습니다. ⚙️ 설정에서 확인해 주세요.';
+    else if (r.status === 403 || r.status === 402) err.user = 'Anthropic 계정의 사용 한도나 결제를 확인해 주세요.';
+    else if (r.status === 429) err.user = 'Claude 요청이 많습니다. 잠시 뒤 다시 해 주세요.';
     throw err;
   }
   const j = await r.json();
@@ -994,10 +1064,85 @@ async function claudeTranslate(e, sc, langs){
   renderEngine(); renderTotal();
   if (j.stop_reason === 'refusal') throw new Error('refusal');
   const txt = (j.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
-  const s = txt.indexOf('{'), en = txt.lastIndexOf('}');
-  if (s < 0 || en < s) throw new Error('json');
-  return JSON.parse(txt.slice(s, en + 1));
+  const a = txt.indexOf(open), z = txt.lastIndexOf(close);
+  if (a < 0 || z < a) throw new Error('json');
+  return JSON.parse(txt.slice(a, z + 1));
 }
+const polishOn = () => S.claude && S.key && S.polish;
+const POLISH_RULE = sc => `"fixed": the same segment in ${L(sc).en}, cleaned up as a careful stenographer would: correct words the speech recognizer clearly mis-heard (judge by the surrounding context${meta().kind === 'general' ? '' : ', especially Bible names, books and church words'}), and add punctuation. Keep the speaker's own words, order and meaning; do not paraphrase, summarize, or add anything. If nothing needs fixing, return the segment with punctuation only.`;
+const normT = t => (t || '').replace(/[\s.,!?·…'"“”‘’~\-:;()「」『』，。！？、]/g, '').toLowerCase();
+function applyFixed(e, fixed){
+  if (typeof fixed !== 'string' || !fixed.trim()) return;
+  fixed = fixed.trim();
+  const heard = e.raw || e.text;
+  if (fixed === e.text) return;
+  if (normT(fixed) === normT(heard)){ e.text = fixed; return; }   // 문장 부호만 붙임
+  e.raw = heard; e.text = fixed; e.pol = true;
+}
+async function claudeTranslate(e, sc, langs){
+  const i = ses.entries.indexOf(e);
+  const before = [];
+  for (let k = i - 1; k >= 0 && before.length < 6; k--){ if (ses.entries[k].div) break; before.unshift(ses.entries[k].text); }
+  const prev = before.join('\n');
+  const pol = polishOn() && !e.polDone;
+  let sys = systemPrompt(sc, langs);
+  if (pol) sys = sys.replace(/Return ONLY a JSON object with exactly these keys: /, `Also return ${POLISH_RULE(sc)}\nReturn ONLY a JSON object with exactly these keys: "fixed", `);
+  if (!langs.length) sys = sys.replace(/Translate the segment into: [^\n]*\n/, 'Do not translate.\n');
+  const user = (prev ? `Earlier context (do NOT translate, for reference only):\n${prev}\n\n` : '') + `Segment:\n${e.raw || e.text}`;
+  const out = await claudeJSON(sys, user);
+  if (pol){ e.polDone = true; applyFixed(e, out.fixed); }
+  return out;
+}
+/* 전체 다듬기: 앞뒤 문맥을 모두 보고 다시 다듬고 번역 */
+let polishing = false;
+$('polishAll').onclick = async () => {
+  if (polishing) return toast('지금 다듬는 중입니다.');
+  if (!S.key) { $('setPanel').hidden = false; $('apiKey').focus(); return toast('전체 다듬기는 Claude를 씁니다. ⚙️ 설정에서 API 키를 넣어 주세요.'); }
+  const idx = ses.entries.map((e, i) => e.div ? -1 : i).filter(i => i >= 0);
+  if (!idx.length) return toast('다듬을 문장이 없습니다.');
+  const b = $('polishAll');
+  if (!b.dataset.sure){ b.dataset.sure = '1'; b.textContent = `✨ ${idx.length}문장 다듬기 — 한 번 더`; setTimeout(() => { delete b.dataset.sure; if (!polishing) b.textContent = '✨ 전체 다듬기'; }, 4000); return; }
+  delete b.dataset.sure; polishing = true;
+  // 사람(순서)별로 묶기
+  const groups = []; let cur = [];
+  ses.entries.forEach((e, i) => { if (e.div){ if (cur.length) groups.push(cur); cur = []; } else cur.push(i); });
+  if (cur.length) groups.push(cur);
+  const chunks = [];
+  groups.forEach(g => { for (let k = 0; k < g.length; k += 12) chunks.push({g, a: k, z: Math.min(g.length, k + 12)}); });
+  let done = 0, failed = 0;
+  for (const ch of chunks){
+    b.textContent = `✨ 다듬는 중… ${Math.round(done / chunks.length * 100)}%`;
+    const items = ch.g.slice(ch.a, ch.z).map(i => ses.entries[i]);
+    const sc = items[0].src || srcCode(ses.src || S.src);
+    const before = ch.g.slice(Math.max(0, ch.a - 4), ch.a).map(i => ses.entries[i].text);
+    const after = ch.g.slice(ch.z, ch.z + 4).map(i => ses.entries[i].raw || ses.entries[i].text);
+    const langs = S.targets.filter(c => c !== sc);
+    const sys = systemPrompt(sc, langs).split('\nReturn ONLY')[0] + `
+You now receive several consecutive segments as a JSON array, with context before and after.
+For each segment return an object with ${POLISH_RULE(sc)}${langs.length ? ` and the keys ${langs.map(c => `"${c}"`).join(', ')} holding the translation of the fixed segment.` : '.'}
+Use the context before AND after to resolve unclear words. Keep one output object per input segment, same order, same count (${items.length}).
+Return ONLY a JSON array of ${items.length} objects. No other text.`;
+    const user = (before.length ? `Context before (do not return):\n${before.join('\n')}\n\n` : '') +
+      `Segments:\n${JSON.stringify(items.map(e => e.raw || e.text))}` +
+      (after.length ? `\n\nContext after (do not return):\n${after.join('\n')}` : '');
+    try{
+      const out = await claudeJSON(sys, user, 6000, '[', ']');
+      items.forEach((e, k) => {
+        const o = out[k]; if (!o) return;
+        if (!e.raw) e.raw = e.text;
+        e.text = e.raw; e.pol = false;  // 들은 그대로에서 다시 시작
+        applyFixed(e, o.fixed); e.polDone = true;
+        if (!e.pol) delete e.raw;
+        langs.forEach(c => { if (typeof o[c] === 'string' && o[c].trim()) e.tr[c] = o[c].trim(); });
+        e.eng = 'claude'; e.pend = []; e.fail = [];
+      });
+    }catch(err){ failed++; if (err.user){ toast(err.user); break; } }
+    done++;
+    const top = $('log').scrollTop; renderAll(); $('log').scrollTop = top; saveSoon();
+  }
+  polishing = false; b.textContent = '✨ 전체 다듬기';
+  toast(failed ? `다듬기를 마쳤습니다. (${failed}묶음은 실패해서 그대로 두었습니다)` : '전체 다듬기를 마쳤습니다. ✨ 표시가 다듬은 문장입니다.');
+};
 function callClaude(body){
   return fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -1202,7 +1347,7 @@ $('dlTxt').onclick = () => {
   const body = ses.entries.map((e, i) => {
     if (e.div) return `\n=== ${spkTitle(i)} (${hms(e.t)}) ===`;
     const p = tm ? `[${hms(e.t)}] ` : '';
-    return p + e.text + langs.filter(c => e.tr[c] != null).map(c => `\n  ${L(c).tag}: ${e.tr[c]}`).join('');
+    return p + e.text + (e.pol ? ` ✨\n  (들은 그대로: ${e.raw})` : '') + langs.filter(c => e.tr[c] != null).map(c => `\n  ${L(c).tag}: ${e.tr[c]}`).join('');
   }).join('\n\n');
   download(fileBase() + '.txt', new Blob(['﻿' + header() + '\n\n' + body + '\n'], {type: 'text/plain;charset=utf-8'}));
 };
@@ -1211,7 +1356,7 @@ function rowsForExport(){
   const out = []; let who = '', no = 0, lang = '';
   ses.entries.forEach((e, i) => {
     if (e.div){ no = spkNo(i); who = e.name || ''; lang = e.src; out.push({div: true, title: spkTitle(i), t: e.t, src: e.src}); return; }
-    out.push({no, who, t: e.t, src: e.src || srcCode(ses.src || S.src), text: e.text, tr: e.tr || {}});
+    out.push({no, who, t: e.t, src: e.src || srcCode(ses.src || S.src), text: e.text, raw: e.pol ? e.raw : '', tr: e.tr || {}});
   });
   return out;
 }
@@ -1233,14 +1378,14 @@ $('dlXlsx').onclick = async () => {
   if (!talk().length) return toast('받을 내용이 없습니다.');
   try{ await loadXlsx(); }catch(e){ return toast('Excel 도구를 불러오지 못했습니다. 다시 눌러 주세요.'); }
   const m = meta(), langs = usedLangs();
-  const head = ['순서', '말한 사람', '시각', '원문 언어', '원문', ...langs.map(c => L(c).name + ' 번역')];
+  const head = ['순서', '말한 사람', '시각', '원문 언어', '원문', '다듬음', '들은 그대로 (다듬기 전)', ...langs.map(c => L(c).name + ' 번역')];
   const data = [head];
   rowsForExport().forEach(r => {
     if (r.div) return;
-    data.push([r.no || '', r.who, hms(r.t), L(r.src).name, r.text, ...langs.map(c => r.tr[c] != null ? r.tr[c] : '')]);
+    data.push([r.no || '', r.who, hms(r.t), L(r.src).name, r.text, r.raw ? '✨' : '', r.raw, ...langs.map(c => r.tr[c] != null ? r.tr[c] : '')]);
   });
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{wch: 6}, {wch: 14}, {wch: 10}, {wch: 10}, {wch: 60}, ...langs.map(() => ({wch: 60}))];
+  ws['!cols'] = [{wch: 6}, {wch: 14}, {wch: 10}, {wch: 10}, {wch: 60}, {wch: 7}, {wch: 40}, ...langs.map(() => ({wch: 60}))];
   ws['!autofilter'] = {ref: XLSX.utils.encode_range({s: {r: 0, c: 0}, e: {r: data.length - 1, c: head.length - 1}})};
   const info = XLSX.utils.aoa_to_sheet([
     ['모임명', m.title], ['날짜', dateLabel(m.date)], ['시작 시각', hms(ses.start)], ['장소', m.place], ['대상', m.who],
@@ -1264,7 +1409,7 @@ function pdfHtml(){
   let body = `<h1>${esc(h1)}</h1>${rest.map(l => `<p class="info">${esc(l)}</p>`).join('')}`;
   rowsForExport().forEach(r => {
     if (r.div){ body += `<h2>${esc(r.title)} <small>${hms(r.t)} · ${esc(L(r.src).name)}</small></h2>`; return; }
-    body += `<div class="e">${tm ? `<span class="tm">${hms(r.t)}</span>` : ''}<div class="o">${esc(r.text)}</div>` +
+    body += `<div class="e">${tm ? `<span class="tm">${hms(r.t)}</span>` : ''}<div class="o">${esc(r.text)}${r.raw ? ' <span class="pm">✨ 다듬음</span>' : ''}</div>${r.raw ? `<div class="rw">들은 그대로: ${esc(r.raw)}</div>` : ''}` +
       langs.filter(c => r.tr[c] != null).map(c => `<div class="t"><b>${L(c).tag}</b> ${esc(r.tr[c])}</div>`).join('') + '</div>';
   });
   const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>${esc(fileBase())}</title><style>
@@ -1275,7 +1420,7 @@ function pdfHtml(){
     h2 small{font-weight:400;color:#666;font-size:9pt}
     .e{padding:6px 0 7px;border-bottom:1px solid #e5e5e5;break-inside:avoid}
     .tm{float:left;width:58px;color:#888;font-size:8.5pt;padding-top:2px}
-    .o,.t{margin-left:${tm ? 62 : 0}px} .t{color:#333;margin-top:2px} .t b{color:#1e4d8c;font-size:8pt;margin-right:4px}
+    .o,.t,.rw{margin-left:${tm ? 62 : 0}px} .rw{color:#888;font-size:8.5pt} .pm{color:#9a6b12;font-size:7.5pt} .t{color:#333;margin-top:2px} .t b{color:#1e4d8c;font-size:8pt;margin-right:4px}
   </style></head><body>${body}</body></html>`;
   return html;
 }
@@ -1318,8 +1463,9 @@ $('dlDocx').onclick = async () => {
     if (e.div){ kids.push(new Paragraph({spacing: {before: 320, after: 160}, children: [new TextRun({text: `${spkTitle(i)}  (${hms(e.t)})`, bold: true, size: 26, color: '1E4D8C'})]})); return; }
     kids.push(new Paragraph({spacing: {after: 40}, children: [
       ...(tm ? [new TextRun({text: hms(e.t) + '  ', color: '999999', size: 18})] : []),
-      new TextRun({text: e.text})
+      new TextRun({text: e.text}), ...(e.pol ? [new TextRun({text: '  ✨다듬음', color: '9A6B12', size: 16})] : [])
     ]}));
+    if (e.pol) kids.push(new Paragraph({indent: {left: 360}, spacing: {after: 30}, children: [new TextRun({text: '들은 그대로: ' + e.raw, color: '888888', size: 18})]}));
     langs.filter(c => e.tr[c] != null).forEach((c, k, a) => kids.push(new Paragraph({indent: {left: 360}, spacing: {after: k === a.length - 1 ? 220 : 30}, children: [
       new TextRun({text: L(c).tag + '  ', bold: true, color: '1E4D8C', size: 18}), new TextRun({text: e.tr[c], color: '333333'})
     ]})));
@@ -1480,6 +1626,8 @@ $('trUrl').value = S.trUrl;
 $('trUrl').onchange = () => { S.trUrl = $('trUrl').value.trim() || DEFAULT_TR_URL; $('trUrl').value = S.trUrl; store.set('lv-trUrl', S.trUrl); };
 if (S.key) $('apiKey').placeholder = '저장됨 (' + S.key.slice(0, 10) + '…' + S.key.slice(-4) + ')';
 
+S.polish = store.get('lv-polish', true);
+$('polishOn').onchange = () => { S.polish = $('polishOn').checked; store.set('lv-polish', S.polish); renderEngine(); };
 $('claudeOn').onchange = () => {
   S.claude = $('claudeOn').checked; store.set('lv-claude', S.claude); renderEngine();
   if (S.claude && !S.key){ $('setPanel').hidden = false; $('apiKey').focus(); }
