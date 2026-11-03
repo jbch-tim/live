@@ -215,6 +215,10 @@
   .cv-say{position:absolute;top:50%;right:8px;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;padding:0;font-size:18px;background:rgba(255,255,255,.8)}
   .cv-say.on{background:var(--red);color:#fff;border-color:var(--red);animation:blink 1.2s infinite}
   .cv-b.old{opacity:.55}
+  .cv-b.old:hover{opacity:1}
+  .cv-del{border:none;background:transparent;color:#9ca3af;font-size:12px;padding:1px 6px;margin-left:6px;border-radius:6px;vertical-align:1px}
+  .cv-del:hover{color:var(--red);background:#fdf0ee}
+  .cv-del.sure{background:var(--red);color:#fff}
   /* 아래 고정 입력창 */
   .cv-dock{position:fixed;left:0;right:0;bottom:0;z-index:25;background:var(--bg);border-top:1px solid var(--line);box-shadow:0 -4px 16px rgba(0,0,0,.08);padding:0 max(10px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}
   .cv-dock > *{max-width:1000px;margin-left:auto;margin-right:auto}
@@ -2423,6 +2427,13 @@ function cvBubble(turn, old){
   const o = document.createElement('div'); o.className = 'cv-o';
   o.innerHTML = flagImg(src.flag); o.append(document.createTextNode(turn.text));
   if (turn.pol){ const p = document.createElement('span'); p.className = 'pol'; p.textContent = '✨ 다듬음'; o.append(p); }
+  const del = document.createElement('button'); del.className = 'cv-del'; del.textContent = '✕ 지우기'; del.title = '잘못 말한 것을 지웁니다';
+  del.onclick = () => {
+    if (!del.classList.contains('sure')){ del.classList.add('sure'); del.textContent = '지울까요?'; setTimeout(() => { del.classList.remove('sure'); del.textContent = '✕ 지우기'; }, 3000); return; }
+    if (cvSpeaking === turn.id) cvStopSpeak();
+    CV.turns = CV.turns.filter(x => x !== turn); cvSave(); cvRenderAll(); toast('지웠습니다.');
+  };
+  o.append(del);
   const t = document.createElement('div'); t.className = 'cv-t' + (turn.tr == null ? ' wait' : '');
   if (turn.tr == null) t.textContent = '통역 중…';
   else if (turn.fail) t.textContent = '번역하지 못했습니다';
