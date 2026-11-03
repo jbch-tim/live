@@ -176,6 +176,7 @@
   .dt3{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:8px}
   .dt3 label{min-width:0}
   body.no-time .ent .tm, body.no-time .spk .hmst{display:none}
+  .ctitle{margin:0 0 12px;font-size:1em}
   .warnbox{background:#fff4e5;border:1px solid #f5d0a0;border-radius:12px;padding:10px 14px;font-size:.88em;margin-bottom:14px}
   @media (max-width:640px){ .lbl{min-width:0;width:100%} }
 </style>
@@ -217,7 +218,7 @@
 
   <!-- 모임 정보 -->
   <section class="card">
-    <h2 style="margin:0 0 10px;font-size:1em">📋 모임 정보 <span class="hint" style="font-weight:400">— 파일 이름·머리말과 번역할 때 쓰입니다</span></h2>
+    <h2 class="ctitle">📋 모임 정보 <span class="hint" style="font-weight:400">— 파일 이름·머리말과 번역할 때 쓰입니다</span></h2>
     <div class="meta-grid">
       <label>모임 종류<select id="mKind" style="width:100%;font-size:1.05em;color:var(--ink)">
         <option value="church">⛪ 교회 (간증·설교·성경공부)</option>
@@ -234,19 +235,9 @@
     </div>
   </section>
 
-  <!-- 조절 -->
+  <!-- 듣기·번역 -->
   <section class="card">
-    <div class="row" style="margin-bottom:12px;align-items:flex-start">
-      <span class="lbl" style="padding-top:8px">말하는 사람</span>
-      <div style="flex:1;min-width:260px">
-        <div id="roster" class="row" style="gap:8px"></div>
-        <div id="addForm" class="addform" hidden>
-          <input type="text" id="newName" placeholder="이름" style="width:12em">
-          <span id="newFlags" class="row" style="gap:6px"></span>
-          <span class="row" style="gap:6px"><button id="addOk" class="primary">추가</button><button id="addCancel">취소</button></span>
-        </div>
-      </div>
-    </div>
+    <h2 class="ctitle">🎧 듣기·번역</h2>
     <div class="row" style="margin-bottom:12px" id="srcRow">
       <span class="lbl">말하는 언어</span>
       <span id="srcFlags" class="row" style="gap:8px"></span>
@@ -278,7 +269,18 @@
       <button id="startBtn" class="bigbtn">● 듣기 시작</button>
       <div class="status" id="status" style="flex:1;min-width:240px"></div>
     </div>
-    <p class="hint" style="margin:10px 0 0">말할 사람들을 미리 <b>+ 사람 추가</b>로 등록해 두세요. 차례가 되면 아래 기록 창에서 그 사람의 <b>🎙 이 사람 말하기</b>를 누르고, 끝나면 <b>⏸ 멈춤</b>을 누르세요.</p>
+  </section>
+
+  <!-- 말하는 사람 -->
+  <section class="card">
+    <h2 class="ctitle">👥 말하는 사람 <span class="hint" style="font-weight:400">— 미리 등록해 두면 아래 기록 창에 순서대로 나옵니다</span></h2>
+    <div id="roster" class="row" style="gap:8px"></div>
+    <div id="addForm" class="addform" hidden>
+      <input type="text" id="newName" placeholder="이름" style="width:12em">
+      <span id="newFlags" class="row" style="gap:6px"></span>
+      <span class="row" style="gap:6px"><button id="addOk" class="primary">추가</button><button id="addCancel">취소</button></span>
+    </div>
+    <p class="hint" style="margin:10px 0 0">차례가 되면 아래 기록 창에서 그 사람의 <b>🎙 이 사람 말하기</b>를 누르고, 끝나면 <b>⏸ 멈춤</b>을 누르세요. 이름은 끌어서 순서를 바꿀 수 있습니다.</p>
   </section>
 
   <!-- 기록 -->
