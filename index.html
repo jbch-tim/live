@@ -166,6 +166,13 @@
   .pchip{cursor:grab}
   .timer{font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink)}
   #recNote button{padding:3px 10px;font-size:.92em;margin-left:4px}
+  .spk .nm.edit{cursor:text;min-width:5em;padding:1px 6px;border-radius:6px;border:1px dashed transparent;border-bottom:1px dashed #9db4d3;outline:none}
+  .spk .nm.edit:hover{border-color:#9db4d3;background:#fff}
+  .spk .nm.edit:focus{border:1px solid var(--accent);background:#fff}
+  .spk .nm.edit:empty::before{content:attr(data-ph);color:#9ca3af;font-weight:400}
+  .langbtn{border:1px solid var(--line);background:#fff;padding:2px 9px;border-radius:999px;font-size:1em;display:inline-flex;align-items:center;gap:5px;color:var(--ink)}
+  .langbtn:hover{border-color:var(--accent);background:#eef4fb;filter:none}
+  .langmenu{min-width:220px}
   .warnbox{background:#fff4e5;border:1px solid #f5d0a0;border-radius:12px;padding:10px 14px;font-size:.88em;margin-bottom:14px}
   @media (max-width:640px){ .lbl{min-width:0;width:100%} }
 </style>
@@ -501,6 +508,54 @@ function makeDraggable(el, id){
   el.addEventListener('dragleave', () => el.classList.remove('dragover'));
   el.addEventListener('drop', ev => { ev.preventDefault(); el.classList.remove('dragover'); moveSpeaker(+ev.dataTransfer.getData('text/plain'), id); });
 }
+/* 기록 창에서 이름 바로 고치기, 언어 바꾸기 */
+function nameField(p, e){
+  const nm = document.createElement('span'); nm.className = 'nm edit'; nm.contentEditable = 'true'; nm.spellcheck = false;
+  nm.dataset.ph = '(이름 없음)'; nm.title = '눌러서 이름 쓰기·고치기';
+  nm.textContent = (p ? p.name : e && e.name) || '';
+  nm.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === 'Escape'){ ev.preventDefault(); nm.blur(); } };
+  nm.onblur = () => {
+    const v = nm.textContent.trim();
+    if (p){ p.name = v; ses.entries.forEach(x => { if (x.div && x.spk === p.id) x.name = v; }); }
+    else if (e) e.name = v;
+    saveNow(); renderRoster();
+  };
+  nm.addEventListener('mousedown', ev => ev.stopPropagation());
+  nm.addEventListener('focus', () => { const r = nm.closest('[draggable]'); if (r){ r.draggable = false; nm._row = r; } });
+  nm.addEventListener('blur', () => { if (nm._row) nm._row.draggable = true; });
+  return nm;
+}
+let langMenu = null;
+function closeLangMenu(){ if (langMenu){ langMenu.remove(); langMenu = null; } }
+document.addEventListener('click', ev => { if (langMenu && !ev.target.closest('.langmenu,.langbtn')) closeLangMenu(); });
+$('log').addEventListener('scroll', closeLangMenu); window.addEventListener('scroll', closeLangMenu);
+function langButton(cur, onPick, label){
+  const b = document.createElement('button'); b.className = 'langbtn'; b.title = '눌러서 말할 언어 바꾸기';
+  b.innerHTML = `${flagImg(speechOf(cur).flag)} ${speechOf(cur).name} ▾`;
+  b.onclick = ev => {
+    ev.stopPropagation();
+    if (langMenu){ closeLangMenu(); return; }
+    const m = document.createElement('div'); m.className = 'menu langmenu';
+    SPEECH.forEach(o => {
+      const it = document.createElement('button'); it.innerHTML = `${flagImg(o.flag)} ${o.name}${o.v === cur ? ' ✓' : ''}`;
+      it.onclick = () => { closeLangMenu(); if (o.v !== cur) onPick(o.v); };
+      m.append(it);
+    });
+    const r = b.getBoundingClientRect();
+    m.style.cssText = `position:fixed;left:${Math.max(8, r.right - 230)}px;bottom:auto;top:${r.bottom + 4}px;z-index:70`;
+    document.body.append(m); langMenu = m;
+    const mr2 = m.getBoundingClientRect();
+    if (mr2.bottom > innerHeight - 8) m.style.top = `${Math.max(8, r.top - mr2.height - 4)}px`;
+  };
+  return b;
+}
+function changeSpeakerLang(p, v){
+  p.lang = v;
+  const ld = lastDivider();
+  if (ses.active === p.id && ld && ld.spk === p.id){ ld.src = srcCode(v); if (want || S.src !== v) setSrc(v); }
+  saveNow(); renderRoster();
+  toast(`${p.name || '이 사람'}의 말할 언어를 ${speechOf(v).name}로 바꿨습니다.`);
+}
 function renderUpcoming(){
   const box = $('upcoming'); if (!box) return;
   box.innerHTML = '';
@@ -510,10 +565,10 @@ function renderUpcoming(){
     n++;
     const d = document.createElement('div'); d.className = 'spk upc'; d.title = '끌어서 순서를 바꿀 수 있습니다';
     d.innerHTML = `<span>⋮⋮</span><b>${n}번째 순서</b>`;
-    const nm = document.createElement('span'); nm.className = 'nm click'; nm.textContent = p.name || '(이름 없음)';
-    nm.title = '누르면 이 사람 차례로 마이크가 켜집니다'; nm.onclick = () => selectSpeaker(p);
+    const nm = nameField(p);
     const go = document.createElement('button'); go.className = 'go'; go.textContent = '🎙 이 사람 말하기'; go.onclick = () => selectSpeaker(p);
-    const meta = document.createElement('span'); meta.className = 'meta'; meta.innerHTML = `차례 기다림 · ${flagImg(speechOf(p.lang).flag)} ${speechOf(p.lang).name}`;
+    const meta = document.createElement('span'); meta.className = 'meta'; meta.textContent = '차례 기다림 · ';
+    meta.append(langButton(p.lang, v => changeSpeakerLang(p, v)));
     const del = document.createElement('button'); del.className = 'del'; del.textContent = '✕ 지우기'; del.title = '이 순서를 명단에서 뺍니다';
     del.onclick = () => {
       if (!del.classList.contains('sure')){ del.classList.add('sure'); del.textContent = '지우기?'; setTimeout(() => { del.classList.remove('sure'); del.textContent = '✕ 지우기'; }, 3000); return; }
@@ -546,13 +601,10 @@ function entryEl(e, i){
     const d = document.createElement('div'); d.className = 'spk ent-like'; d.dataset.i = i;
     d.innerHTML = `<span>👤</span><b>${spkNo(i)}번째 순서</b>`;
     const p = e.spk && roster().find(x => x.id === e.spk);
-    const nm = document.createElement('span'); nm.className = 'nm';
-    nm.textContent = e.name || (p && p.name) || '';
+    const nm = nameField(p, e);
     const extra = [];
+    const lastDiv = ses.entries.map(x => x.div).lastIndexOf(true) === i;
     if (p){
-      nm.classList.add('click'); nm.title = '누르면 이 사람 차례로 마이크가 켜집니다';
-      nm.onclick = () => selectSpeaker(p);
-      const lastDiv = ses.entries.map(x => x.div).lastIndexOf(true) === i;
       const go = document.createElement('button'); go.className = 'go'; go.onclick = () => selectSpeaker(p);
       if (lastDiv && ses.active === p.id && want){
         const lv = document.createElement('span'); lv.className = 'live'; lv.textContent = '● 듣는 중'; extra.push(lv);
@@ -560,12 +612,10 @@ function entryEl(e, i){
       } else if (lastDiv && ses.active === p.id){ go.textContent = '▶ 이어서 말하기'; }
       else go.textContent = '🎙 이 사람 말하기';
       extra.push(go);
-    } else {
-      nm.contentEditable = 'true'; nm.title = '눌러서 이름 고치기';
-      nm.onblur = () => { e.name = nm.textContent.trim(); saveSoon(); };
-      nm.onkeydown = ev => { if (ev.key === 'Enter'){ ev.preventDefault(); nm.blur(); } };
     }
-    const meta = document.createElement('span'); meta.className = 'meta'; meta.innerHTML = `${hms(e.t)} · ${flagImg(L(e.src).flag)} ${L(e.src).name}`;
+    const meta = document.createElement('span'); meta.className = 'meta';
+    if (p && lastDiv){ meta.textContent = `${hms(e.t)} · `; meta.append(langButton(p.lang, v => changeSpeakerLang(p, v))); }
+    else meta.innerHTML = `${hms(e.t)} · ${flagImg(L(e.src).flag)} ${L(e.src).name}`;
     const db = delBtn(i, '이 순서 표시'); db.textContent = '✕ 지우기'; db.dataset.label = '✕ 지우기';
     d.append(nm, ...extra, meta, db); return d;
   }
