@@ -59,12 +59,18 @@
   .seg button{border:none;border-radius:0;padding:7px 12px}
   .seg button.on{background:var(--accent);color:#fff}
   #log{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:6px 16px;min-height:220px;max-height:62vh;overflow:auto;scroll-behavior:smooth}
-  .ent{padding:10px 0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:auto 1fr;gap:2px 12px}
+  .ent{padding:10px 0;border-bottom:1px solid var(--line);display:grid;gap:2px 12px}
   .ent:last-child{border-bottom:none}
   .spk{margin:14px 0 4px;padding:8px 12px;border-radius:10px;background:#eef4fb;border:1px solid #c9d9ee;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:.9em}
   .spk b{color:var(--accent)}
   .spk .nm{font-weight:700;min-width:3em;padding:0 4px;border-bottom:1px dashed #9db4d3;outline:none;cursor:text}
   .spk .meta{color:var(--muted);font-size:.85em;margin-left:auto}
+  .del{border:none;background:transparent;color:#9ca3af;padding:2px 8px;font-size:.8em;border-radius:8px}
+  .del:hover{background:#fbe3df;color:var(--red)}
+  .del.sure{background:var(--red);color:#fff}
+  .ent .del{visibility:hidden;align-self:start}
+  .ent:hover .del,.ent .del.sure{visibility:visible}
+  .ent{grid-template-columns:auto 1fr auto}
   .ent .tm{color:var(--muted);font-size:.75em;font-variant-numeric:tabular-nums;padding-top:.3em;white-space:nowrap}
   .ent .body{min-width:0}
   .ent .o{font-size:1em}
@@ -341,6 +347,22 @@ function renderEngine(){
 }
 
 /* ---------- 기록 표시 ---------- */
+function delBtn(i, what){
+  const b = document.createElement('button'); b.className = 'del'; b.textContent = '✕'; b.title = what + ' 지우기';
+  b.onclick = () => {
+    if (!b.classList.contains('sure')){
+      b.classList.add('sure'); b.textContent = '지우기?';
+      setTimeout(() => { b.classList.remove('sure'); b.textContent = '✕'; }, 3000); return;
+    }
+    const e = ses.entries[i];
+    ses.entries.splice(i, 1);
+    const qi = queue.indexOf(e); if (qi >= 0) queue.splice(qi, 1);
+    const top = $('log').scrollTop;
+    renderAll(); $('log').scrollTop = top; saveNow();
+    toast(e.div ? '순서 표시를 지웠습니다. 그 뒤 말은 앞사람 쪽으로 합쳐집니다.' : '문장을 지웠습니다.');
+  };
+  return b;
+}
 function entryEl(e, i){
   if (e.div){
     const d = document.createElement('div'); d.className = 'spk ent-like'; d.dataset.i = i;
@@ -350,7 +372,7 @@ function entryEl(e, i){
     nm.onblur = () => { e.name = nm.textContent.trim(); saveSoon(); };
     nm.onkeydown = ev => { if (ev.key === 'Enter'){ ev.preventDefault(); nm.blur(); } };
     const meta = document.createElement('span'); meta.className = 'meta'; meta.textContent = `${hms(e.t)} · ${L(e.src).name}`;
-    d.append(nm, meta); return d;
+    d.append(nm, meta, delBtn(i, '이 순서 표시')); return d;
   }
   const d = document.createElement('div'); d.className = 'ent'; d.dataset.i = i;
   const tm = document.createElement('div'); tm.className = 'tm'; tm.textContent = hms(e.t);
@@ -371,7 +393,7 @@ function entryEl(e, i){
     } else { t.className = 't wait'; tx.textContent = '번역 중…'; }
     t.append(lg, tx); b.append(t);
   });
-  d.append(tm, b);
+  d.append(tm, b, delBtn(i, '이 문장'));
   return d;
 }
 function nearBottom(){ const g = $('log'); return g.scrollHeight - g.scrollTop - g.clientHeight < 80; }
@@ -388,6 +410,7 @@ function renderAll(){
 function updateEntry(i){
   const stick = nearBottom();
   const old = $('log').querySelector(`[data-i="${i}"]`);
+  if (!ses.entries[i]) return;
   const n = entryEl(ses.entries[i], i);
   if (old) old.replaceWith(n); else $('log').insertBefore(n, $('interim'));
   $('emptyMsg').hidden = true;
@@ -551,7 +574,11 @@ $('nextBtn').onclick = () => {
   if (interimText){ pushPiece(interimText); interimText = ''; }
   flushBuf();
   if (!ses.entries.length){ ses.start = Date.now(); ses.src = S.src; }
-  ses.entries.push({div: true, t: Date.now(), name: $('spkName').value.trim(), src: srcCode(S.src)});
+  const last = ses.entries[ses.entries.length - 1];
+  const nm = $('spkName').value.trim();
+  if (last && last.div){ // 아직 아무 말도 없는 순서는 새로 만들지 않고 고쳐 씀
+    if (nm) last.name = nm; last.src = srcCode(S.src); last.t = Date.now();
+  } else ses.entries.push({div: true, t: Date.now(), name: nm, src: srcCode(S.src)});
   $('spkName').value = '';
   updateEntry(ses.entries.length - 1); saveNow();
   if (want){ startRec(false); }  // 앞사람 말이 섞이지 않게 새로 듣기
@@ -579,7 +606,7 @@ function renderStatus(){
 
 /* ---------- 번역 ---------- */
 const queue = []; let busy = 0;
-function enqueue(i){ queue.push(i); pump(); }
+function enqueue(i){ const e = ses.entries[i]; if (e && !e.div) queue.push(e); pump(); }
 function pump(){
   while (busy < 2 && queue.length){
     const i = queue.shift(); busy++;
@@ -587,15 +614,15 @@ function pump(){
   }
   renderStatus();
 }
-async function translateEntry(i){
-  const e = ses.entries[i];
+async function translateEntry(e){
+  if (ses.entries.indexOf(e) < 0) return;
   const langs = [...(e.pend || [])];
   if (!langs.length) return;
   const sc = e.src || srcCode(ses.src || S.src);
   let done = false;
   if (S.claude && S.key){
     try{
-      const out = await claudeTranslate(i, sc, langs);
+      const out = await claudeTranslate(e, sc, langs);
       langs.forEach(c => { if (typeof out[c] === 'string' && out[c].trim()) e.tr[c] = out[c].trim(); });
       e.eng = 'claude';
       done = langs.every(c => e.tr[c] != null);
@@ -615,7 +642,8 @@ async function translateEntry(i){
   }
   e.pend = langs.filter(c => e.tr[c] == null && !(e.fail || []).includes(c));
   e.fail = (e.fail || []).filter(c => e.tr[c] == null);
-  updateEntry(i); saveSoon();
+  const i = ses.entries.indexOf(e);
+  if (i >= 0){ updateEntry(i); saveSoon(); }
 }
 function retry(i){
   const e = ses.entries[i];
@@ -648,8 +676,8 @@ Rules:
 - Keep God/Jesus terms reverent and consistent (e.g. Korean 하나님, 예수님).
 Return ONLY a JSON object with exactly these keys: ${langs.map(c => `"${c}"`).join(', ')}. Each value is the translation string. No other text.`;
 }
-async function claudeTranslate(i, sc, langs){
-  const e = ses.entries[i];
+async function claudeTranslate(e, sc, langs){
+  const i = ses.entries.indexOf(e);
   const before = [];
   for (let k = i - 1; k >= 0 && before.length < 4; k--){ if (ses.entries[k].div) break; before.unshift(ses.entries[k].text); }
   const prev = before.join('\n');
