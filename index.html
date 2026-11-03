@@ -140,6 +140,11 @@
   .addchip{border-style:dashed;color:var(--accent);font-weight:600}
   .addform{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;padding:10px;border:1px dashed #9db4d3;border-radius:12px;background:#f6f9fd}
   .addform .fbtn{padding:4px 9px;font-size:.85em}
+  .newbtn{margin-left:auto;background:linear-gradient(180deg,#2c63ad,#1e4d8c);color:#fff;border:none;font-weight:700;padding:9px 18px;border-radius:12px;box-shadow:0 2px 6px rgba(30,77,140,.3)}
+  .newbtn:hover{filter:brightness(1.08)}
+  .clearbtn{background:#fff;color:var(--red);border:1px solid #f1c4bd;padding:7px 12px}
+  .clearbtn:hover{background:#fdf0ee;filter:none}
+  .clearbtn.sure{background:var(--red);color:#fff;border-color:var(--red)}
   .warnbox{background:#fff4e5;border:1px solid #f5d0a0;border-radius:12px;padding:10px 14px;font-size:.88em;margin-bottom:14px}
   @media (max-width:640px){ .lbl{min-width:0;width:100%} }
 </style>
@@ -242,6 +247,7 @@
       <button data-v="tr">번역만</button>
       <button data-v="or">원문만</button>
     </div>
+    <button id="clearBtn" class="clearbtn" title="지금 화면의 기록을 모두 지웁니다">🗑 지우기</button>
     <span id="countInfo" class="hint" style="margin-left:auto"></span>
   </div>
   <div id="log"><div class="empty" id="emptyMsg">"듣기 시작"을 누르고 말씀을 시작하면 여기에 받아 적고 번역합니다.</div><div class="interim" id="interim"></div></div>
@@ -275,7 +281,7 @@
       </div>
     </div>
     <label class="hint" style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="withTime" checked style="margin:0"> 시각 포함</label>
-    <button id="newBtn" style="margin-left:auto">🆕 새로 시작</button>
+    <button id="newBtn" class="newbtn" title="지금 기록은 지난 기록에 보관하고 새 기록을 시작합니다">＋ 새로 시작</button>
   </section>
 </main>
 
@@ -1189,6 +1195,21 @@ function archive(){
   list.push(ses); while (list.length > 30) list.shift();
   while (!store.set('lv-sessions', list) && list.length > 1) list.shift();
 }
+$('clearBtn').onclick = () => {
+  const b = $('clearBtn');
+  if (!ses.entries.length && !buf) return toast('지울 기록이 없습니다.');
+  if (!b.classList.contains('sure')){
+    b.classList.add('sure'); b.textContent = '정말 지울까요? 한 번 더';
+    setTimeout(() => { b.classList.remove('sure'); b.textContent = '🗑 지우기'; }, 3500); return;
+  }
+  b.classList.remove('sure'); b.textContent = '🗑 지우기';
+  buf = ''; interimText = ''; showInterim();
+  ses.entries = []; queue.length = 0; ses.active = null;
+  ses.start = Date.now(); ses.usage = {in: 0, out: 0, usd: 0, n: 0};
+  runAccum = 0; if (runStart) runStart = Date.now();
+  saveNow(); renderAll(); renderEngine(); renderRoster(); renderStatus();
+  toast('기록을 지웠습니다. (모임 정보와 사람 명단은 그대로입니다)');
+};
 $('newBtn').onclick = () => {
   if (want) return toast('먼저 "듣기 멈춤"을 눌러 주세요.');
   if (!ses.entries.length) return toast('이미 새 기록입니다.');
