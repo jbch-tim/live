@@ -164,6 +164,8 @@
   .spk .nm.click{cursor:pointer;border-bottom-style:solid}
   .spk .nm.click:hover{color:var(--red)}
   .pchip{cursor:grab}
+  .timer{font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink)}
+  #recNote button{padding:3px 10px;font-size:.92em;margin-left:4px}
   .warnbox{background:#fff4e5;border:1px solid #f5d0a0;border-radius:12px;padding:10px 14px;font-size:.88em;margin-bottom:14px}
   @media (max-width:640px){ .lbl{min-width:0;width:100%} }
 </style>
@@ -406,7 +408,7 @@ let lastSaved = 0, saveFail = false;
 
 /* ---------- 도우미 ---------- */
 const hms = t => { const d = new Date(t); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
-const dur = ms => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 3600)}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`; };
+const dur = ms => { const s = Math.floor(ms / 1000); return `${pad(Math.floor(s / 3600))}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`; };
 const usd = v => v < 0.01 ? `$${v.toFixed(4)}` : `$${v.toFixed(3)}`;
 let toastT;
 function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
@@ -688,7 +690,7 @@ setInterval(() => {
   if (!recActive && now - lastStartTry > 3000) startRec(true);
   else if (recActive && now - lastEvent > 45000 && !interimText){ try{ rec.stop(); }catch(e){} lastEvent = now; } // 오래 아무 소식이 없으면 새로 고침
   renderStatus();
-}, 2000);
+}, 1000);
 
 /* 짧게 끊긴 말 조각을 모아 한 문장으로 만들기 */
 let buf = '', bufStart = 0, lastSpeech = 0;
@@ -778,7 +780,7 @@ function stopUI(){
 $('startBtn').onclick = () => { want ? stopListening() : startListening(); renderRoster(); };
 /* ---------- 녹음 ---------- */
 S.record = store.get('lv-record', false);
-let mr = null, mrStream = null, mrSeg = 0, mrIdx = 0, mrMime = '', recRun = 0, recStart = 0, recBytes = 0;
+let mr = null, mrStream = null, mrSeg = 0, mrIdx = 0, mrMime = '', recRun = ses.recMs || 0, recStart = 0, recBytes = 0;
 const idb = (() => {
   let p = null;
   return () => p || (p = new Promise((ok, no) => {
@@ -821,6 +823,33 @@ async function recordStart(){
   };
   mr.start(5000); recStart = Date.now();
   renderStatus();
+}
+function recMs(){ return recRun + (recStart ? Date.now() - recStart : 0); }
+function renderRecNote(){
+  const n = $('recNote'); if (!n) return;
+  ses.recMs = recMs();
+  if (ses.hasAudio || mr){
+    const live = mr && mr.state === 'recording';
+    if (n.dataset.mode !== (live ? 'live' : 'have')){
+      n.dataset.mode = live ? 'live' : 'have';
+      n.innerHTML = `<span id="recTime"></span> <button id="recGet">⬇ 받기</button> <button id="recDel" class="clearbtn">🗑 녹음 지우기</button>`;
+      $('recGet').onclick = () => $('dlAudio').click();
+      $('recDel').onclick = deleteRecording;
+    }
+    $('recTime').innerHTML = `${live ? '<b style="color:var(--red)">● 녹음 중</b>' : '녹음 있음'} <span class="timer">${dur(recMs())}</span>`;
+  } else if (n.dataset.mode !== 'none'){
+    n.dataset.mode = 'none';
+    n.textContent = '듣는 동안 목소리를 녹음해서, 끝난 뒤 ⬇️ 저장 → 녹음 파일로 받습니다.';
+  }
+}
+function deleteRecording(){
+  const b = $('recDel');
+  if (!b.classList.contains('sure')){ b.classList.add('sure'); b.textContent = '정말 지울까요? 한 번 더'; setTimeout(() => { if ($('recDel')){ $('recDel').classList.remove('sure'); $('recDel').textContent = '🗑 녹음 지우기'; } }, 3500); return; }
+  const going = want && S.record;
+  recordStop(); recRun = 0; idbDel(ses.id); ses.hasAudio = false; ses.recMs = 0; saveNow();
+  $('recNote').dataset.mode = ''; renderStatus();
+  if (going) recordStart();   // 듣는 중이면 새로 녹음 시작
+  toast('녹음을 지웠습니다. 받아 적은 기록은 그대로입니다.');
 }
 function recordPause(){
   if (mr && mr.state === 'recording'){ try{ mr.requestData(); mr.pause(); }catch(e){} recRun += Date.now() - recStart; recStart = 0; }
@@ -957,19 +986,19 @@ function renderStatus(){
   const listened = runAccum + (runStart ? Date.now() - runStart : 0);
   const bits = [];
   if (want){
-    bits.push(`<span class="live-dot on"></span><b>${recActive ? '듣는 중' : '다시 연결 중…'}</b> ${dur(listened)}`);
+    bits.push(`<span class="live-dot on"></span><b>${recActive ? '듣는 중' : '다시 연결 중…'}</b> <span class="timer" title="이 기록에서 들은 시간">⏱ ${dur(listened)}</span>`);
     bits.push(wake ? '<span class="pill ok">화면 꺼짐 방지</span>' : '<span class="pill warn">화면 꺼짐 방지 안 됨</span>');
     if (restarts) bits.push(`<span class="pill">자동 재시작 ${restarts}회</span>`);
     if (lastErr === 'network') bits.push('<span class="err">인터넷 연결 확인 중</span>');
   } else {
-    bits.push(`<span class="live-dot"></span>멈춤${listened ? ' · 들은 시간 ' + dur(listened) : ''}`);
+    bits.push(`<span class="live-dot"></span>멈춤 <span class="timer" title="이 기록에서 들은 시간">⏱ ${dur(listened)}</span>`);
   }
-  if (mr){ const t = recRun + (recStart ? Date.now() - recStart : 0);
-    bits.push(mr.state === 'recording' ? `<span class="pill warn">● 녹음 ${dur(t)}</span>` : `<span class="pill">녹음 멈춤 ${dur(t)}</span>`); }
+  if (mr && mr.state === 'recording') bits.push(`<span class="pill warn">● 녹음 중</span>`);
   if (saveFail) bits.push('<span class="pill warn">저장 실패</span>');
-  else if (lastSaved) bits.push(`<span class="pill ok">자동 저장 ${hms(lastSaved)}</span>`);
+  else if (lastSaved) bits.push(`<span class="pill ok" title="마지막 저장 ${hms(lastSaved)} — 창을 닫아도 기록이 남습니다">✔ 자동 저장됨</span>`);
   if (queue.length + busy > 0) bits.push(`<span class="pill">번역 대기 ${queue.length + busy}</span>`);
   $('status').innerHTML = bits.join(' ');
+  renderRecNote();
   $('stageStatus').textContent = want ? (recActive ? '● 듣는 중' : '다시 연결 중…') : '멈춤';
 }
 
@@ -1557,7 +1586,7 @@ $('clearBtn').onclick = () => {
     setTimeout(() => { b.classList.remove('sure'); b.textContent = '🗑 지우기'; }, 3500); return;
   }
   b.classList.remove('sure'); b.textContent = '🗑 지우기';
-  recordStop(); recRun = 0; idbDel(ses.id);
+  recordStop(); recRun = 0; idbDel(ses.id); ses.hasAudio = false; ses.recMs = 0;
   buf = ''; interimText = ''; showInterim();
   ses.entries = []; queue.length = 0; ses.active = null;
   ses.start = Date.now(); ses.usage = {in: 0, out: 0, usd: 0, n: 0};
@@ -1598,7 +1627,7 @@ function renderSessions(){
     open.onclick = () => {
       if (want) return toast('먼저 "듣기 멈춤"을 눌러 주세요.');
       archive(); store.set('lv-runAccum-' + ses.id, runAccum);
-      ses = x; runAccum = x.listened || 0; setTimeout(() => { fillMeta(); renderRoster(); }); S.src = x.src || S.src; $('srcLang').value = S.src;
+      recordStop(); ses = x; runAccum = x.listened || 0; recRun = x.recMs || 0; setTimeout(() => { fillMeta(); renderRoster(); renderStatus(); }); S.src = x.src || S.src; $('srcLang').value = S.src;
       store.set('lv-sessions', store.get('lv-sessions', []).filter(y => y.id !== x.id));
       saveNow(); renderTargets(); renderAll(); renderEngine(); renderSessions(); renderStatus();
       $('setPanel').hidden = true; toast('지난 기록을 열었습니다. 이어서 들을 수도 있습니다.');
