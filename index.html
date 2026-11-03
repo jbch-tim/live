@@ -181,6 +181,8 @@
   .sendbtn{color:#fff;border:none;font-weight:700;padding:7px 12px}
   .sendbtn.cl{background:#c96442} .sendbtn.gp{background:#10a37f} .sendbtn.tr{background:var(--accent)}
   .sendbtn:hover{filter:brightness(1.08)}
+  #engSeg button small{font-weight:400;opacity:.75;font-size:.78em}
+  .ent .t.gm .lgf .flag{box-shadow:0 0 0 2px #4f7df3}
   .warnbox{background:#fff4e5;border:1px solid #f5d0a0;border-radius:12px;padding:10px 14px;font-size:.88em;margin-bottom:14px}
   @media (max-width:640px){ .lbl{min-width:0;width:100%} }
 </style>
@@ -200,6 +202,14 @@
   <!-- 설정 -->
   <section class="card panel" id="setPanel" hidden>
     <h2>⚙️ 설정</h2>
+    <p class="row"><span class="lbl">Gemini 무료 키</span>
+      <input type="password" id="gKey" placeholder="AIza…" style="flex:1;min-width:220px" autocomplete="off">
+      <button id="gSave" class="primary">저장</button>
+      <button id="gTest">연결 확인</button>
+      <button id="gDel">지우기</button>
+    </p>
+    <p class="hint">구글 계정으로 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> 에서 무료로 받습니다. 하루 쓸 수 있는 양에 한도가 있고, 무료로 쓰면 보낸 내용이 구글 제품 개선에 쓰일 수 있습니다.</p>
+    <p class="status" id="gStatus"></p>
     <p class="row"><span class="lbl">Anthropic API 키</span>
       <input type="password" id="apiKey" placeholder="sk-ant-…" style="flex:1;min-width:220px" autocomplete="off">
       <button id="keySave" class="primary">저장</button>
@@ -260,7 +270,11 @@
     </div>
     <div class="row" style="margin-bottom:12px">
       <span class="lbl">번역 방식</span>
-      <label class="switch"><input type="checkbox" id="claudeOn"><span class="track"></span><span>Claude 실시간 번역</span></label>
+      <span class="seg" id="engSeg">
+        <button data-e="google">무료 Google</button>
+        <button data-e="gemini">Gemini <small>무료</small></button>
+        <button data-e="claude">Claude <small>유료</small></button>
+      </span>
       <label id="polishWrap" class="chk" title="앞 문맥을 보고 잘못 알아들은 말을 바로잡습니다. 들은 그대로의 말도 함께 남깁니다."><input type="checkbox" id="polishOn"> ✨ 문장 다듬기</label>
       <span id="engineNote" class="hint"></span>
     </div>
@@ -389,7 +403,8 @@ const store = {
 const S = {
   src: store.get('lv-src', 'ko-KR'),
   targets: store.get('lv-targets', ['en', 'fr']),
-  claude: store.get('lv-claude', false),
+  engine: store.get('lv-engine', store.get('lv-claude', false) ? 'claude' : 'google'),
+  gkey: store.get('lv-gkey', ''),
   key: store.get('lv-key', ''),
   pIn: store.get('lv-pIn', 0.10),
   pOut: store.get('lv-pOut', 0.50),
@@ -401,6 +416,7 @@ const S = {
 };
 const pad = n => String(n).padStart(2, '0');
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+Object.defineProperty(S, 'claude', {get(){ return S.engine === 'claude'; }});
 const newSession = () => {
   const last = store.get('lv-meta-last', {});
   return {id: Date.now(), start: Date.now(), entries: [], usage: {in:0, out:0, usd:0, n:0}, src: S.src,
@@ -492,15 +508,19 @@ function renderExLang(){
 }
 
 function renderEngine(){
-  $('claudeOn').checked = S.claude;
-  $('polishOn').checked = S.polish; $('polishWrap').hidden = !S.claude; $('polishWrap').classList.toggle('on', S.polish);
-  if (S.claude){
-    const u = ses.usage;
+  [...$('engSeg').children].forEach(x => x.classList.toggle('on', x.dataset.e === S.engine));
+  $('polishOn').checked = S.polish; $('polishWrap').hidden = S.engine === 'google'; $('polishWrap').classList.toggle('on', S.polish);
+  const u = ses.usage;
+  if (S.engine === 'claude'){
     $('engineNote').innerHTML = S.key
-      ? `<span class="cost">Claude Haiku 5.5 · 이번 기록 ${u.n}문장 ${usd(u.usd)}</span> <span class="hint">(1시간에 대략 10센트 안팎)</span>`
-      : `<span style="color:var(--red)">API 키가 없습니다. ⚙️ 설정에서 넣어 주세요. (그동안은 Google 번역으로 합니다)</span>`;
+      ? `<span class="cost">Claude Haiku 5.5 · 이번 기록 ${u.n}번 ${usd(u.usd)}</span> <span class="hint">(1시간에 대략 10센트 안팎)</span>`
+      : `<span style="color:var(--red)">Anthropic API 키가 없습니다. ⚙️ 설정에서 넣어 주세요. (그동안은 Google 번역으로 합니다)</span>`;
+  } else if (S.engine === 'gemini'){
+    $('engineNote').innerHTML = S.gkey
+      ? `<span class="hint">Google 번역이 먼저 나오고, 20초마다 Gemini가 문맥을 보고 다듬어 바꿉니다. 무료(하루 한도 안).</span>`
+      : `<span style="color:var(--red)">Gemini 키가 없습니다. ⚙️ 설정에서 넣어 주세요. (그동안은 Google 번역으로 합니다)</span>`;
   } else {
-    $('engineNote').textContent = '지금은 무료 Google 번역';
+    $('engineNote').textContent = '무료 · 끝난 뒤 ✨ 전체 다듬기나 Claude 버튼으로 정리할 수 있습니다';
   }
 }
 
@@ -647,7 +667,7 @@ function entryEl(e, i){
     const tx = document.createElement('span'); tx.className = 'tx';
     const lg = document.createElement('span'); lg.className = 'lgf'; lg.innerHTML = flagImg(L(c).flag); lg.title = L(c).name;
     if (e.tr && e.tr[c] != null){
-      t.className = 't' + (e.eng === 'claude' ? ' cl' : '');
+      t.className = 't' + (e.eng === 'claude' ? ' cl' : e.eng === 'gemini' ? ' gm' : '');
       tx.textContent = e.tr[c];
     } else if ((e.fail || []).includes(c)){
       t.className = 't fail'; tx.textContent = '번역하지 못했습니다';
@@ -789,7 +809,7 @@ function addEntry(raw, at){
   const text = raw.replace(/\s+/g, ' ').trim();
   if (!text) return;
   const sc = srcCode(S.src);
-  const e = {t: at || Date.now(), text, src: sc, tr: {}, pend: activeTargets(sc), fail: []};
+  const e = {t: at || Date.now(), text, src: sc, tr: {}, pend: activeTargets(sc), fail: [], gq: S.engine === 'gemini' && !!S.gkey};
   ses.entries.push(e);
   const i = ses.entries.length - 1;
   updateEntry(i); renderExLang(); saveSoon();
@@ -1150,6 +1170,43 @@ Rules:
 - Keep God/Jesus terms reverent and consistent (e.g. Korean 하나님, 예수님).
 Return ONLY a JSON object with exactly these keys: ${langs.map(c => `"${c}"`).join(', ')}. Each value is the translation string. No other text.`;
 }
+let GMODEL = store.get('lv-gmodel', 'gemini-flash-lite-latest');
+const GFALLBACK = ['gemini-flash-lite-latest', 'gemini-3.1-flash-lite', 'gemini-2.5-flash-lite', 'gemini-flash-latest'];
+async function geminiCall(key, system, user, maxTokens){
+  const body = {contents: [{role: 'user', parts: [{text: user}]}], generationConfig: {responseMimeType: 'application/json', maxOutputTokens: maxTokens}};
+  if (system) body.systemInstruction = {parts: [{text: system}]};
+  for (let k = 0; k < GFALLBACK.length + 1; k++){
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GMODEL}:generateContent`, {
+      method: 'POST', headers: {'content-type': 'application/json', 'x-goog-api-key': key}, body: JSON.stringify(body)});
+    if (r.status === 404){   // 모델 이름이 바뀐 경우 다음 후보로
+      const next = GFALLBACK.find(m => m !== GMODEL && !geminiCall.tried.has(m));
+      geminiCall.tried.add(GMODEL); if (!next) return r; GMODEL = next; store.set('lv-gmodel', GMODEL); continue;
+    }
+    return r;
+  }
+}
+geminiCall.tried = new Set();
+let gBlockedUntil = 0;
+async function geminiJSON(system, user, maxTokens = 1500, open = '{', close = '}'){
+  if (Date.now() < gBlockedUntil) throw Object.assign(new Error('gemini wait'), {quota: true});
+  let r = await geminiCall(S.gkey, system, user, maxTokens);
+  if (r.status === 503 || r.status >= 500){ await new Promise(z => setTimeout(z, 2000)); r = await geminiCall(S.gkey, system, user, maxTokens); }
+  if (!r.ok){
+    const msg = await r.text().catch(() => '');
+    const err = new Error('gemini ' + r.status);
+    if (r.status === 429){ err.quota = true; gBlockedUntil = Date.now() + 60000;
+      err.user = /day|daily|per_day|PerDay/i.test(msg) ? 'Gemini 오늘 무료 한도를 다 썼습니다. 내일 다시 쓰거나 Claude를 쓰세요.' : 'Gemini 무료 한도(1분)에 걸렸습니다. 잠시 뒤 이어서 합니다.'; }
+    else if (r.status === 400 && /API_KEY|api key/i.test(msg)) err.user = 'Gemini 키가 맞지 않습니다. ⚙️ 설정에서 확인해 주세요.';
+    else if (r.status === 403) err.user = 'Gemini 키를 쓸 수 없습니다. 키를 다시 받아 주세요.';
+    throw err;
+  }
+  const j = await r.json();
+  const txt = ((j.candidates || [])[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
+  const a = txt.indexOf(open), z = txt.lastIndexOf(close);
+  if (a < 0 || z < a) throw new Error('json');
+  return JSON.parse(txt.slice(a, z + 1));
+}
+const aiJSON = (eng, ...args) => eng === 'gemini' ? geminiJSON(...args) : claudeJSON(...args);
 async function claudeJSON(system, user, maxTokens = 1500, open = '{', close = '}'){
   const body = {model: MODEL, max_tokens: maxTokens, system, messages: [{role: 'user', content: user}]};
   if (!noThinkingParam) body.thinking = {type: 'disabled'};
@@ -1180,7 +1237,7 @@ async function claudeJSON(system, user, maxTokens = 1500, open = '{', close = '}
   if (a < 0 || z < a) throw new Error('json');
   return JSON.parse(txt.slice(a, z + 1));
 }
-const polishOn = () => S.claude && S.key && S.polish;
+const polishOn = () => S.engine === 'claude' && S.key && S.polish;
 const POLISH_RULE = sc => `"fixed": the same segment in ${L(sc).en}, cleaned up as a careful stenographer would: correct words the speech recognizer clearly mis-heard (judge by the surrounding context${meta().kind === 'general' ? '' : ', especially Bible names, books and church words'}), and add punctuation. Keep the speaker's own words, order and meaning; do not paraphrase, summarize, or add anything. If nothing needs fixing, return the segment with punctuation only.`;
 const normT = t => (t || '').replace(/[\s.,!?·…'"“”‘’~\-:;()「」『』，。！？、]/g, '').toLowerCase();
 function applyFixed(e, fixed){
@@ -1205,56 +1262,101 @@ async function claudeTranslate(e, sc, langs){
   if (pol){ e.polDone = true; applyFixed(e, out.fixed); }
   return out;
 }
-/* 전체 다듬기: 앞뒤 문맥을 모두 보고 다시 다듬고 번역 */
+/* 여러 문장을 앞뒤 문맥과 함께 다듬고 번역 */
+async function polishChunk(items, before, after, eng, doPolish = true){
+  const sc = items[0].src || srcCode(ses.src || S.src);
+  const langs = S.targets.filter(c => c !== sc);
+  const fixRule = doPolish ? POLISH_RULE(sc) : `"fixed": the segment exactly as given`;
+  const sys = systemPrompt(sc, langs).split('\nReturn ONLY')[0] + `
+You now receive several consecutive segments as a JSON array, with context before and after.
+For each segment return an object with ${fixRule}${langs.length ? ` and the keys ${langs.map(c => `"${c}"`).join(', ')} holding the translation of the fixed segment.` : '.'}
+Use the context before AND after to resolve unclear words. Keep one output object per input segment, same order, same count (${items.length}).
+Return ONLY a JSON array of ${items.length} objects. No other text.`;
+  const user = (before.length ? `Context before (do not return):\n${before.join('\n')}\n\n` : '') +
+    `Segments:\n${JSON.stringify(items.map(e => e.raw || e.text))}` +
+    (after.length ? `\n\nContext after (do not return):\n${after.join('\n')}` : '');
+  const out = await aiJSON(eng, sys, user, eng === 'gemini' ? 12000 : 6000, '[', ']');
+  if (!Array.isArray(out)) throw new Error('json');
+  items.forEach((e, k) => {
+    const o = out[k]; if (!o || ses.entries.indexOf(e) < 0) return;
+    if (doPolish){
+      if (!e.raw) e.raw = e.text;
+      e.text = e.raw; e.pol = false;   // 들은 그대로에서 다시 시작
+      applyFixed(e, o.fixed); e.polDone = true;
+      if (!e.pol) delete e.raw;
+    }
+    langs.forEach(c => { if (typeof o[c] === 'string' && o[c].trim()) e.tr[c] = o[c].trim(); });
+    e.eng = eng; e.pend = []; e.fail = []; e.gq = false;
+  });
+}
+const batchEngine = () => S.engine === 'claude' && S.key ? 'claude' : S.gkey ? 'gemini' : S.key ? 'claude' : null;
 let polishing = false;
 $('polishAll').onclick = async () => {
   if (polishing) return toast('지금 다듬는 중입니다.');
-  if (!S.key) { $('setPanel').hidden = false; $('apiKey').focus(); return toast('전체 다듬기는 Claude를 씁니다. ⚙️ 설정에서 API 키를 넣어 주세요.'); }
+  const eng = batchEngine();
+  if (!eng){ $('setPanel').hidden = false; $('gKey').focus(); return toast('전체 다듬기는 Gemini(무료)나 Claude를 씁니다. ⚙️ 설정에서 Gemini 무료 키를 넣어 주세요.'); }
   const idx = ses.entries.map((e, i) => e.div ? -1 : i).filter(i => i >= 0);
   if (!idx.length) return toast('다듬을 문장이 없습니다.');
   const b = $('polishAll');
-  if (!b.dataset.sure){ b.dataset.sure = '1'; b.textContent = `✨ ${idx.length}문장 다듬기 — 한 번 더`; setTimeout(() => { delete b.dataset.sure; if (!polishing) b.textContent = '✨ 전체 다듬기'; }, 4000); return; }
+  const name = eng === 'gemini' ? 'Gemini 무료' : 'Claude';
+  if (!b.dataset.sure){ b.dataset.sure = '1'; b.textContent = `✨ ${idx.length}문장 다듬기 (${name}) — 한 번 더`; setTimeout(() => { delete b.dataset.sure; if (!polishing) b.textContent = '✨ 전체 다듬기'; }, 4000); return; }
   delete b.dataset.sure; polishing = true;
-  // 사람(순서)별로 묶기
   const groups = []; let cur = [];
   ses.entries.forEach((e, i) => { if (e.div){ if (cur.length) groups.push(cur); cur = []; } else cur.push(i); });
   if (cur.length) groups.push(cur);
+  const size = eng === 'gemini' ? 25 : 12;
   const chunks = [];
-  groups.forEach(g => { for (let k = 0; k < g.length; k += 12) chunks.push({g, a: k, z: Math.min(g.length, k + 12)}); });
+  groups.forEach(g => { for (let k = 0; k < g.length; k += size) chunks.push({g, a: k, z: Math.min(g.length, k + size)}); });
   let done = 0, failed = 0;
   for (const ch of chunks){
-    b.textContent = `✨ 다듬는 중… ${Math.round(done / chunks.length * 100)}%`;
+    b.textContent = `✨ 다듬는 중 (${name})… ${Math.round(done / chunks.length * 100)}%`;
     const items = ch.g.slice(ch.a, ch.z).map(i => ses.entries[i]);
-    const sc = items[0].src || srcCode(ses.src || S.src);
     const before = ch.g.slice(Math.max(0, ch.a - 4), ch.a).map(i => ses.entries[i].text);
     const after = ch.g.slice(ch.z, ch.z + 4).map(i => ses.entries[i].raw || ses.entries[i].text);
-    const langs = S.targets.filter(c => c !== sc);
-    const sys = systemPrompt(sc, langs).split('\nReturn ONLY')[0] + `
-You now receive several consecutive segments as a JSON array, with context before and after.
-For each segment return an object with ${POLISH_RULE(sc)}${langs.length ? ` and the keys ${langs.map(c => `"${c}"`).join(', ')} holding the translation of the fixed segment.` : '.'}
-Use the context before AND after to resolve unclear words. Keep one output object per input segment, same order, same count (${items.length}).
-Return ONLY a JSON array of ${items.length} objects. No other text.`;
-    const user = (before.length ? `Context before (do not return):\n${before.join('\n')}\n\n` : '') +
-      `Segments:\n${JSON.stringify(items.map(e => e.raw || e.text))}` +
-      (after.length ? `\n\nContext after (do not return):\n${after.join('\n')}` : '');
-    try{
-      const out = await claudeJSON(sys, user, 6000, '[', ']');
-      items.forEach((e, k) => {
-        const o = out[k]; if (!o) return;
-        if (!e.raw) e.raw = e.text;
-        e.text = e.raw; e.pol = false;  // 들은 그대로에서 다시 시작
-        applyFixed(e, o.fixed); e.polDone = true;
-        if (!e.pol) delete e.raw;
-        langs.forEach(c => { if (typeof o[c] === 'string' && o[c].trim()) e.tr[c] = o[c].trim(); });
-        e.eng = 'claude'; e.pend = []; e.fail = [];
-      });
-    }catch(err){ failed++; if (err.user){ toast(err.user); break; } }
+    let ok = false;
+    for (let tries = 0; tries < 3 && !ok; tries++){
+      try{ await polishChunk(items, before, after, eng); ok = true; }
+      catch(err){
+        if (err.quota && /오늘/.test(err.user || '')){ toast(err.user); tries = 9; break; }
+        if (err.quota){ b.textContent = '✨ 한도 때문에 잠시 기다리는 중…'; gBlockedUntil = 0; await new Promise(z => setTimeout(z, 61000)); continue; }
+        if (err.user){ toast(err.user); tries = 9; break; }
+      }
+    }
+    if (!ok) failed++;
     done++;
     const top = $('log').scrollTop; renderAll(); $('log').scrollTop = top; saveSoon();
+    if (eng === 'gemini' && done < chunks.length) await new Promise(z => setTimeout(z, 6500));  // 무료 한도: 1분에 10번
   }
   polishing = false; b.textContent = '✨ 전체 다듬기';
-  toast(failed ? `다듬기를 마쳤습니다. (${failed}묶음은 실패해서 그대로 두었습니다)` : '전체 다듬기를 마쳤습니다. ✨ 표시가 다듬은 문장입니다.');
+  toast(failed ? `다듬기를 마쳤습니다. (${failed}묶음은 다듬지 못해 그대로 두었습니다)` : `전체 다듬기를 마쳤습니다 (${name}). ✨ 표시가 다듬은 문장입니다.`);
 };
+
+/* Gemini 실시간: Google 번역을 먼저 보여 주고, 20초마다 모아서 다듬기·번역 */
+let gRunning = false, gLastRun = 0, gWarned = 0;
+setInterval(async () => {
+  if (S.engine !== 'gemini' || !S.gkey || gRunning || polishing) return;
+  if (Date.now() < gBlockedUntil) return;
+  const waiting = ses.entries.map((e, i) => (!e.div && e.gq && !inflight.has(e) && !(e.pend || []).length) ? i : -1).filter(i => i >= 0);
+  if (!waiting.length) return;
+  if (Date.now() - gLastRun < 20000 && waiting.length < 10) return;
+  gRunning = true; gLastRun = Date.now();
+  try{
+    // 같은 사람의 이어진 문장만 한 묶음으로
+    const first = waiting[0]; let last = first;
+    while (last + 1 < ses.entries.length && !ses.entries[last + 1].div && waiting.includes(last + 1) && last - first < 14) last++;
+    const items = ses.entries.slice(first, last + 1);
+    const before = []; for (let k = first - 1; k >= 0 && before.length < 5; k--){ if (ses.entries[k].div) break; before.unshift(ses.entries[k].text); }
+    await polishChunk(items, before, [], 'gemini', S.polish);
+    const top = $('log').scrollTop, stick = nearBottom();
+    for (let k = first; k <= last; k++) updateEntry(k);
+    if (!stick) $('log').scrollTop = top;
+    saveSoon();
+  }catch(err){
+    if (err.user && Date.now() - gWarned > 120000){ toast(err.user + ' (Google 번역은 계속됩니다)'); gWarned = Date.now(); }
+    if (!err.quota) ses.entries.forEach(e => { if (e.gq && e.gTries > 2) e.gq = false; else if (e.gq) e.gTries = (e.gTries || 0) + 1; });
+  }finally{ gRunning = false; }
+}, 3000);
+
 function callClaude(body){
   return fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -1724,6 +1826,25 @@ $('keySave').onclick = () => {
   S.key = k; store.set('lv-key', k); $('apiKey').value = ''; $('apiKey').placeholder = '저장됨 (' + k.slice(0, 10) + '…' + k.slice(-4) + ')';
   renderEngine(); toast('API 키를 저장했습니다.');
 };
+$('gSave').onclick = () => {
+  const k = $('gKey').value.trim(); if (!k) return toast('키를 넣어 주세요.');
+  S.gkey = k; store.set('lv-gkey', k); $('gKey').value = ''; $('gKey').placeholder = '저장됨 (' + k.slice(0, 6) + '…' + k.slice(-4) + ')';
+  renderEngine(); toast('Gemini 키를 저장했습니다.');
+};
+$('gDel').onclick = () => { S.gkey = ''; store.del('lv-gkey'); $('gKey').placeholder = 'AIza…'; $('gStatus').textContent = ''; renderEngine(); toast('Gemini 키를 지웠습니다.'); };
+$('gTest').onclick = async () => {
+  const k = $('gKey').value.trim() || S.gkey; if (!k) return toast('키를 먼저 넣어 주세요.');
+  $('gStatus').textContent = '확인 중…';
+  try{
+    const r = await geminiCall(k, '', 'Reply with the JSON {"ok":true}', 50);
+    const msg = r.ok ? '' : await r.text();
+    $('gStatus').innerHTML = r.ok ? `<span style="color:var(--green)">✔ 연결됐습니다 (${GMODEL}). 무료로 쓸 수 있습니다.</span>`
+      : r.status === 429 ? '<span style="color:var(--red)">✘ 지금은 무료 한도에 걸려 있습니다. 잠시 뒤 다시 해 보세요.</span>'
+      : /API_KEY|api key/i.test(msg) || r.status === 400 ? '<span style="color:var(--red)">✘ 키가 맞지 않습니다.</span>'
+      : `<span style="color:var(--red)">✘ 문제가 있습니다 (코드 ${r.status}).</span>`;
+  }catch(e){ $('gStatus').innerHTML = '<span style="color:var(--red)">✘ 연결하지 못했습니다. 인터넷을 확인해 주세요.</span>'; }
+};
+if (S.gkey) $('gKey').placeholder = '저장됨 (' + S.gkey.slice(0, 6) + '…' + S.gkey.slice(-4) + ')';
 $('keyDel').onclick = () => { S.key = ''; store.del('lv-key'); $('apiKey').placeholder = 'sk-ant-…'; renderEngine(); $('keyStatus').textContent = ''; toast('API 키를 지웠습니다.'); };
 $('keyTest').onclick = async () => {
   const k = $('apiKey').value.trim() || S.key;
@@ -1751,9 +1872,11 @@ if (S.key) $('apiKey').placeholder = '저장됨 (' + S.key.slice(0, 10) + '…' 
 
 S.polish = store.get('lv-polish', true);
 $('polishOn').onchange = () => { S.polish = $('polishOn').checked; store.set('lv-polish', S.polish); renderEngine(); };
-$('claudeOn').onchange = () => {
-  S.claude = $('claudeOn').checked; store.set('lv-claude', S.claude); renderEngine();
-  if (S.claude && !S.key){ $('setPanel').hidden = false; $('apiKey').focus(); }
+$('engSeg').onclick = ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  S.engine = b.dataset.e; store.set('lv-engine', S.engine); renderEngine();
+  if (S.engine === 'claude' && !S.key){ $('setPanel').hidden = false; $('apiKey').focus(); }
+  if (S.engine === 'gemini' && !S.gkey){ $('setPanel').hidden = false; $('gKey').focus(); }
 };
 $('srcLang').value = S.src;
 function setSrc(v, quiet){
