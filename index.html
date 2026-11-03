@@ -175,6 +175,7 @@
   .langmenu{min-width:220px}
   .dt3{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:8px}
   .dt3 label{min-width:0}
+  body.no-time .ent .tm, body.no-time .spk .hmst{display:none}
   .warnbox{background:#fff4e5;border:1px solid #f5d0a0;border-radius:12px;padding:10px 14px;font-size:.88em;margin-bottom:14px}
   @media (max-width:640px){ .lbl{min-width:0;width:100%} }
 </style>
@@ -620,8 +621,8 @@ function entryEl(e, i){
       extra.push(go);
     }
     const meta = document.createElement('span'); meta.className = 'meta';
-    if (p && lastDiv){ meta.textContent = `${hms(e.t)} · `; meta.append(langButton(p.lang, v => changeSpeakerLang(p, v))); }
-    else meta.innerHTML = `${hms(e.t)} · ${flagImg(L(e.src).flag)} ${L(e.src).name}`;
+    if (p && lastDiv){ meta.innerHTML = `<span class="hmst">${hms(e.t)} · </span>`; meta.append(langButton(p.lang, v => changeSpeakerLang(p, v))); }
+    else meta.innerHTML = `<span class="hmst">${hms(e.t)} · </span>${flagImg(L(e.src).flag)} ${L(e.src).name}`;
     const db = delBtn(i, '이 순서 표시'); db.textContent = '✕ 지우기'; db.dataset.label = '✕ 지우기';
     d.append(nm, ...extra, meta, db); return d;
   }
@@ -1456,7 +1457,7 @@ $('dlTxt').onclick = () => {
   const tm = $('withTime').checked;
   const langs = LANGS.map(l => l.code).filter(c => talk().some(e => e.tr[c] != null));
   const body = ses.entries.map((e, i) => {
-    if (e.div) return `\n=== ${spkTitle(i)} (${hms(e.t)}) ===`;
+    if (e.div) return `\n=== ${spkTitle(i)}${tm ? ` (${hms(e.t)})` : ''} ===`;
     const p = tm ? `[${hms(e.t)}] ` : '';
     return p + e.text + (e.pol ? ` ✨\n  (들은 그대로: ${e.raw})` : '') + langs.filter(c => e.tr[c] != null).map(c => `\n  ${L(c).tag}: ${e.tr[c]}`).join('');
   }).join('\n\n');
@@ -1489,14 +1490,15 @@ $('dlXlsx').onclick = async () => {
   if (!talk().length) return toast('받을 내용이 없습니다.');
   try{ await loadXlsx(); }catch(e){ return toast('Excel 도구를 불러오지 못했습니다. 다시 눌러 주세요.'); }
   const m = meta(), langs = usedLangs();
-  const head = ['순서', '말한 사람', '시각', '원문 언어', '원문', '다듬음', '들은 그대로 (다듬기 전)', ...langs.map(c => L(c).name + ' 번역')];
+  const tm = $('withTime').checked;
+  const head = ['순서', '말한 사람', ...(tm ? ['시각'] : []), '원문 언어', '원문', '다듬음', '들은 그대로 (다듬기 전)', ...langs.map(c => L(c).name + ' 번역')];
   const data = [head];
   rowsForExport().forEach(r => {
     if (r.div) return;
-    data.push([r.no || '', r.who, hms(r.t), L(r.src).name, r.text, r.raw ? '✨' : '', r.raw, ...langs.map(c => r.tr[c] != null ? r.tr[c] : '')]);
+    data.push([r.no || '', r.who, ...(tm ? [hms(r.t)] : []), L(r.src).name, r.text, r.raw ? '✨' : '', r.raw, ...langs.map(c => r.tr[c] != null ? r.tr[c] : '')]);
   });
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{wch: 6}, {wch: 14}, {wch: 10}, {wch: 10}, {wch: 60}, {wch: 7}, {wch: 40}, ...langs.map(() => ({wch: 60}))];
+  ws['!cols'] = [{wch: 6}, {wch: 14}, ...(tm ? [{wch: 10}] : []), {wch: 10}, {wch: 60}, {wch: 7}, {wch: 40}, ...langs.map(() => ({wch: 60}))];
   ws['!autofilter'] = {ref: XLSX.utils.encode_range({s: {r: 0, c: 0}, e: {r: data.length - 1, c: head.length - 1}})};
   const info = XLSX.utils.aoa_to_sheet([
     ['모임명', m.title], ['날짜', dateLabel(m.date)], ['시작', m.startT || hms(ses.start).slice(0, 5)], ['끝', m.endT], ['장소', m.place], ['대상', m.who],
@@ -1519,7 +1521,7 @@ function pdfHtml(){
   const [h1, ...rest] = header().split('\n');
   let body = `<h1>${esc(h1)}</h1>${rest.map(l => `<p class="info">${esc(l)}</p>`).join('')}`;
   rowsForExport().forEach(r => {
-    if (r.div){ body += `<h2>${esc(r.title)} <small>${hms(r.t)} · ${esc(L(r.src).name)}</small></h2>`; return; }
+    if (r.div){ body += `<h2>${esc(r.title)} <small>${tm ? hms(r.t) + ' · ' : ''}${esc(L(r.src).name)}</small></h2>`; return; }
     body += `<div class="e">${tm ? `<span class="tm">${hms(r.t)}</span>` : ''}<div class="o">${esc(r.text)}${r.raw ? ' <span class="pm">✨ 다듬음</span>' : ''}</div>${r.raw ? `<div class="rw">들은 그대로: ${esc(r.raw)}</div>` : ''}` +
       langs.filter(c => r.tr[c] != null).map(c => `<div class="t"><b>${L(c).tag}</b> ${esc(r.tr[c])}</div>`).join('') + '</div>';
   });
@@ -1571,7 +1573,7 @@ $('dlDocx').onclick = async () => {
   const langs = LANGS.map(l => l.code).filter(c => talk().some(e => e.tr[c] != null));
   const kids = header().split('\n').map((ln, k) => new Paragraph({spacing: {after: k ? 240 : 60}, children: [new TextRun({text: ln, bold: !k, size: k ? 20 : 28, color: k ? '666666' : undefined})]}));
   ses.entries.forEach((e, i) => {
-    if (e.div){ kids.push(new Paragraph({spacing: {before: 320, after: 160}, children: [new TextRun({text: `${spkTitle(i)}  (${hms(e.t)})`, bold: true, size: 26, color: '1E4D8C'})]})); return; }
+    if (e.div){ kids.push(new Paragraph({spacing: {before: 320, after: 160}, children: [new TextRun({text: `${spkTitle(i)}${tm ? `  (${hms(e.t)})` : ''}`, bold: true, size: 26, color: '1E4D8C'})]})); return; }
     kids.push(new Paragraph({spacing: {after: 40}, children: [
       ...(tm ? [new TextRun({text: hms(e.t) + '  ', color: '999999', size: 18})] : []),
       new TextRun({text: e.text}), ...(e.pol ? [new TextRun({text: '  ✨다듬음', color: '9A6B12', size: 16})] : [])
@@ -1787,6 +1789,13 @@ Object.entries(MF).forEach(([id, k]) => {
     saveSoon();
   });
 });
+$('withTime').checked = store.get('lv-withTime', true);
+document.body.classList.toggle('no-time', !$('withTime').checked);
+$('withTime').onchange = () => {
+  store.set('lv-withTime', $('withTime').checked);
+  document.body.classList.toggle('no-time', !$('withTime').checked);
+  toast($('withTime').checked ? '시각을 보여 줍니다. 복사·저장에도 들어갑니다.' : '시각을 숨겼습니다. 복사·저장에서도 빠집니다.');
+};
 fillMeta(); renderRoster();
 applyFs(); applyView(); renderTargets(); renderEngine(); renderTotal(); renderAll(); renderStatus();
 // 닫히기 전에 번역되지 못한 문장 이어서 번역
