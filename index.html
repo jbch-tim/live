@@ -132,7 +132,7 @@
   .pchip.on{border-color:var(--red);background:#fdf0ee;box-shadow:0 0 0 1px var(--red) inset;font-weight:700}
   .pchip.on .no{background:var(--red);color:#fff}
   .pchip.on::after{content:"● 듣는 중";font-size:.72em;color:var(--red);font-weight:600}
-  .pchip.on.paused::after{content:"멈춤";color:var(--muted)}
+  .pchip.on.paused::after{content:"⏸ 멈춤";color:var(--muted)}
   .pwrap{display:inline-flex;align-items:center;gap:0}
   .pwrap .mini{border:none;background:transparent;color:#c0c4cc;padding:4px 3px;font-size:.78em}
   .pwrap .mini:hover{color:var(--ink)}
@@ -156,6 +156,9 @@
   .polishbtn:hover{background:#fff4dc;filter:none}
   .spk .go{margin-left:6px;padding:3px 10px;font-size:.85em;border-radius:999px;border:1px solid var(--red);color:var(--red);background:#fff;font-weight:600}
   .spk .go:hover{background:#fdf0ee;filter:none}
+  .spk .go.stop{background:var(--red);color:#fff}
+  .spk .go.stop:hover{background:#a93226}
+  .spk .del{color:#b0645a}
   .spk .live{margin-left:6px;font-size:.8em;color:var(--red);font-weight:700}
   .spk.upc{background:#fafafa;border-style:dashed;border-color:#d6d0c4;cursor:grab}
   .spk.upc b{color:var(--muted)}
@@ -511,7 +514,13 @@ function renderUpcoming(){
     nm.title = '누르면 이 사람 차례로 마이크가 켜집니다'; nm.onclick = () => selectSpeaker(p);
     const go = document.createElement('button'); go.className = 'go'; go.textContent = '🎙 이 사람 말하기'; go.onclick = () => selectSpeaker(p);
     const meta = document.createElement('span'); meta.className = 'meta'; meta.innerHTML = `차례 기다림 · ${flagImg(speechOf(p.lang).flag)} ${speechOf(p.lang).name}`;
-    d.append(nm, go, meta);
+    const del = document.createElement('button'); del.className = 'del'; del.textContent = '✕ 지우기'; del.title = '이 순서를 명단에서 뺍니다';
+    del.onclick = () => {
+      if (!del.classList.contains('sure')){ del.classList.add('sure'); del.textContent = '지우기?'; setTimeout(() => { del.classList.remove('sure'); del.textContent = '✕ 지우기'; }, 3000); return; }
+      ses.roster = roster().filter(x => x.id !== p.id); if (ses.active === p.id) ses.active = null;
+      saveNow(); renderRoster(); toast('순서를 지웠습니다.');
+    };
+    d.append(nm, go, meta, del);
     makeDraggable(d, p.id);
     box.append(d);
   });
@@ -521,7 +530,7 @@ function delBtn(i, what){
   b.onclick = () => {
     if (!b.classList.contains('sure')){
       b.classList.add('sure'); b.textContent = '지우기?';
-      setTimeout(() => { b.classList.remove('sure'); b.textContent = '✕'; }, 3000); return;
+      setTimeout(() => { b.classList.remove('sure'); b.textContent = b.dataset.label || '✕'; }, 3000); return;
     }
     const e = ses.entries[i];
     ses.entries.splice(i, 1);
@@ -544,15 +553,21 @@ function entryEl(e, i){
       nm.classList.add('click'); nm.title = '누르면 이 사람 차례로 마이크가 켜집니다';
       nm.onclick = () => selectSpeaker(p);
       const lastDiv = ses.entries.map(x => x.div).lastIndexOf(true) === i;
-      if (lastDiv && ses.active === p.id && want){ const lv = document.createElement('span'); lv.className = 'live'; lv.textContent = '● 듣는 중'; extra.push(lv); }
-      else { const go = document.createElement('button'); go.className = 'go'; go.textContent = '🎙 이 사람 말하기'; go.onclick = () => selectSpeaker(p); extra.push(go); }
+      const go = document.createElement('button'); go.className = 'go'; go.onclick = () => selectSpeaker(p);
+      if (lastDiv && ses.active === p.id && want){
+        const lv = document.createElement('span'); lv.className = 'live'; lv.textContent = '● 듣는 중'; extra.push(lv);
+        go.classList.add('stop'); go.textContent = '⏸ 멈춤';
+      } else if (lastDiv && ses.active === p.id){ go.textContent = '▶ 이어서 말하기'; }
+      else go.textContent = '🎙 이 사람 말하기';
+      extra.push(go);
     } else {
       nm.contentEditable = 'true'; nm.title = '눌러서 이름 고치기';
       nm.onblur = () => { e.name = nm.textContent.trim(); saveSoon(); };
       nm.onkeydown = ev => { if (ev.key === 'Enter'){ ev.preventDefault(); nm.blur(); } };
     }
     const meta = document.createElement('span'); meta.className = 'meta'; meta.innerHTML = `${hms(e.t)} · ${flagImg(L(e.src).flag)} ${L(e.src).name}`;
-    d.append(nm, ...extra, meta, delBtn(i, '이 순서 표시')); return d;
+    const db = delBtn(i, '이 순서 표시'); db.textContent = '✕ 지우기'; db.dataset.label = '✕ 지우기';
+    d.append(nm, ...extra, meta, db); return d;
   }
   const d = document.createElement('div'); d.className = 'ent'; d.dataset.i = i;
   const tm = document.createElement('div'); tm.className = 'tm'; tm.textContent = hms(e.t);
@@ -857,7 +872,7 @@ function renderRoster(){
     b.className = 'pchip' + (ses.active === p.id ? ' on' + (want ? '' : ' paused') : '');
     b.innerHTML = `<span class="no">${k + 1}</span>${flagImg(speechOf(p.lang).flag)} <span></span>`;
     b.querySelector('span:last-child').textContent = p.name || `${k + 1}번 사람`;
-    b.title = `${p.name || ''} · ${speechOf(p.lang).name} — 누르면 이 사람 차례로 듣기 시작`;
+    b.title = ses.active === p.id && want ? '누르면 멈춥니다' : ses.active === p.id ? '누르면 이어서 듣습니다' : `${p.name || ''} · ${speechOf(p.lang).name} — 누르면 이 사람 차례로 듣기 시작`;
     b.onclick = () => selectSpeaker(p);
     const ed = document.createElement('button'); ed.className = 'mini'; ed.textContent = '✎'; ed.title = '고치기';
     ed.onclick = () => openAdd(p);
@@ -915,8 +930,16 @@ $('addOk').onclick = () => {
 };
 $('newName').onkeydown = e => { if (e.key === 'Enter') $('addOk').click(); if (e.key === 'Escape') $('addCancel').click(); };
 
+function lastDivider(){ for (let k = ses.entries.length - 1; k >= 0; k--) if (ses.entries[k].div) return ses.entries[k]; return null; }
 function selectSpeaker(p){
-  if (ses.active === p.id && want){ toast(`지금 ${p.name || '이 사람'} 차례입니다.`); return; }
+  if (ses.active === p.id){
+    if (want){ stopListening(); renderRoster(); toast(`${p.name || '이 사람'} — 멈췄습니다. 다시 누르면 이어서 듣습니다.`); return; }
+    const ld = lastDivider();
+    if (ld && ld.spk === p.id){   // 같은 사람 이어서
+      if (S.src !== p.lang) setSrc(p.lang, true);
+      startListening(); renderRoster(); toast(`${p.name || '이 사람'} — 이어서 듣습니다.`); return;
+    }
+  }
   if (interimText){ pushPiece(interimText); interimText = ''; }
   flushBuf();
   if (S.src !== p.lang) setSrc(p.lang, true);
