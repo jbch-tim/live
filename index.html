@@ -4,6 +4,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>실시간 통역</title>
+<link rel="manifest" id="mfLink" href="manifest-live.json">
+<link rel="apple-touch-icon" id="atiLink" href="icons/live-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" id="atTitle" content="실시간 통역">
+<meta name="theme-color" id="themeMeta" content="#1e4d8c">
+<script>
+  /* 바로가기: #conv 로 열면 대화 모드 이름·아이콘으로 */
+  function applyShortcutLook(conv){
+    document.getElementById('mfLink').href = conv ? 'manifest-conv.json' : 'manifest-live.json';
+    document.getElementById('atiLink').href = conv ? 'icons/conv-180.png' : 'icons/live-180.png';
+    document.getElementById('atTitle').content = conv ? '대화 통역' : '실시간 통역';
+    document.getElementById('themeMeta').content = conv ? '#c26a06' : '#1e4d8c';
+    document.title = conv ? '대화 통역' : '실시간 통역';
+  }
+  applyShortcutLook(location.hash === '#conv');
+</script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>">
 <style>
   :root{
@@ -2148,6 +2165,8 @@ function setMode(m){
   $('convMode').hidden = m !== 'conv';
   document.querySelectorAll('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
   store.set('lv-mode', m);
+  try{ history.replaceState(null, '', location.pathname + location.search + (m === 'conv' ? '#conv' : '')); }catch(e){}
+  applyShortcutLook(m === 'conv');
   if (m === 'conv'){
     if (want){ stopListening(); renderRoster(); toast('실시간 통역 듣기를 멈추고 대화 모드로 왔습니다.'); }
     cvRenderTop(); cvRenderAll();
@@ -2529,7 +2548,8 @@ $('cvClear').onclick = () => {
 };
 
 cvRenderTop(); cvRenderAll();
-setMode(store.get('lv-mode', 'live'));
+setMode(location.hash === '#conv' ? 'conv' : location.hash === '#live' ? 'live' : store.get('lv-mode', 'live'));
+addEventListener('hashchange', () => { if (location.hash === '#conv') setMode('conv'); else if (location.hash === '#live') setMode('live'); });
 
 </script>
 </body>
