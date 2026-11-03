@@ -186,11 +186,14 @@
       <button id="cpBoth">📋 원문+번역 복사</button>
       <button id="dlTxt">⬇️ 텍스트 파일</button>
       <button id="dlDocx">⬇️ Word 파일</button>
+      <button id="sendClaude" class="primary" style="background:#c96442;border-color:#c96442">↗ Claude로 보내기</button>
+      <button id="sendGpt" class="primary" style="background:#10a37f;border-color:#10a37f">↗ ChatGPT로 보내기</button>
       <button id="sendTr" class="primary">↗ 통·번역기로 보내기</button>
       <button id="fillBtn">↻ 빠진 번역 채우기</button>
       <button id="newBtn" style="margin-left:auto">🆕 새로 시작</button>
     </div>
-    <p class="hint" style="margin-bottom:0">"통·번역기로 보내기"는 원문을 복사한 뒤 통·번역기를 새 탭으로 엽니다. 거기서 <b>파일·붙여넣기</b> 칸에 붙여넣기(맥 ⌘V, 윈도우 Ctrl+V) 하시면 됩니다.</p>
+    <p class="hint" style="margin-bottom:0"><b>Claude·ChatGPT로 보내기</b>: 받아 적은 원문 전체와 번역 부탁 글을 함께 복사하고 새 대화를 엽니다. 입력칸에 붙여넣기(맥 ⌘V, 윈도우 Ctrl+V) 한 뒤 보내기만 누르세요. 구독 안에서 하는 것이라 따로 돈이 들지 않습니다.<br>
+    <b>통·번역기로 보내기</b>: 원문을 복사한 뒤 통·번역기를 엽니다. <b>파일·붙여넣기</b> 칸에 붙여넣으시면 됩니다.</p>
   </section>
 </main>
 
@@ -774,6 +777,35 @@ $('sendTr').onclick = () => {
   copyText(text, '원문을').then(ok => { if (ok) toast('원문을 복사했습니다. 통·번역기의 "파일·붙여넣기" 칸에 붙여넣어 주세요.'); });
   if (!w) toast('새 탭이 막혔습니다. 팝업 허용 후 다시 눌러 주세요.');
 };
+
+function chatPrompt(){
+  const sc = srcCode(ses.src || S.src);
+  let langs = activeTargets();
+  if (!langs.length) langs = sc === 'ko' ? ['en'] : ['ko'];
+  const body = ses.entries.map(e => e.text).join('\n');
+  const names = langs.map(c => ({ko:'한국어', en:'영어', fr:'프랑스어', zh:'중국어(간체)', es:'스페인어'})[c]);
+  const bibles = langs.concat(sc).filter((v, i, a) => a.indexOf(v) === i)
+    .map(c => `${({ko:'한국어', en:'영어', fr:'프랑스어', zh:'중국어', es:'스페인어'})[c]}: ${L(c).bible}`).join(', ');
+  return `아래는 교회에서 한 ${({ko:'한국어', en:'영어', fr:'프랑스어', zh:'중국어', es:'스페인어'})[sc]} 간증(또는 설교)을 음성 인식으로 받아 적은 원문입니다. ${new Date(ses.start).toLocaleDateString('ko-KR')}, ${ses.entries.length}문장.
+
+부탁드립니다:
+1. 음성 인식 때문에 잘못 적힌 말(특히 성경 인물·책 이름, 교회 용어)을 문맥에 맞게 고치고, 문장 부호를 넣고, 내용 흐름에 따라 문단을 나누어 "정리된 원문"을 보여 주세요. 말한 내용은 빼거나 보태지 마세요.
+2. 정리된 원문을 ${names.join(', ')}로 번역해 주세요. 언어마다 제목을 달아 따로 보여 주세요.
+- 말하는 사람의 말투와 감정이 살아 있는 자연스러운 번역으로 해 주세요.
+- 성경 구절을 인용하거나 언급하면 이 번역본의 표현을 따라 주세요: ${bibles}.
+
+--- 원문 ---
+${body}`;
+}
+function sendToChat(url, name){
+  if (!ses.entries.length) return toast('보낼 원문이 없습니다.');
+  const text = chatPrompt();
+  const w = window.open(url, '_blank');
+  copyText(text, '원문과 부탁 글을').then(ok => { if (ok) toast(`복사했습니다. ${name} 입력칸에 붙여넣고(⌘V / Ctrl+V) 보내기를 누르세요.`); });
+  if (!w) toast('새 탭이 막혔습니다. 팝업 허용 후 다시 눌러 주세요.');
+}
+$('sendClaude').onclick = () => sendToChat('https://claude.ai/new', 'Claude');
+$('sendGpt').onclick = () => sendToChat('https://chatgpt.com/', 'ChatGPT');
 
 /* ---------- 새로 시작·지난 기록 ---------- */
 function archive(){
