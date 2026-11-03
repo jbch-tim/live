@@ -172,9 +172,17 @@
     </div>
     <div class="row" style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)">
       <span class="lbl">말하는 사람</span>
-      <input type="text" id="spkName" placeholder="이름 (안 써도 됩니다)" style="width:13em">
+      <input type="text" id="spkName" placeholder="이름 (안 써도 됩니다)" style="width:12em">
+      <select id="spkLang" title="이 사람이 말하는 언어">
+        <option value="ko-KR">한국어</option>
+        <option value="en-US">English (영어)</option>
+        <option value="fr-CA">Français – Canada (프랑스어 퀘벡)</option>
+        <option value="fr-FR">Français – France (프랑스어 프랑스)</option>
+        <option value="cmn-Hans-CN">中文 (중국어)</option>
+        <option value="es-ES">Español (스페인어)</option>
+      </select>
       <button id="nextBtn">👤 다음 사람 시작</button>
-      <span class="hint">사람이 바뀔 때 이름을 쓰고(필요하면 위에서 말하는 언어도 바꾸고) 누르세요.</span>
+      <span class="hint" style="width:100%">사람이 바뀔 때 이름과 <b>그 사람이 말하는 언어</b>를 고르고 누르세요. 듣는 중에도 됩니다.</span>
     </div>
   </section>
 
@@ -306,13 +314,19 @@ function renderTargets(){
   LANGS.forEach(l => {
     const lab = document.createElement('label');
     const same = l.code === sc;
-    const on = S.targets.includes(l.code) && !same;
-    lab.className = 'chk' + (same ? ' off' : '') + (on ? ' on' : '');
-    lab.innerHTML = `<input type="checkbox" ${on ? 'checked' : ''} ${same ? 'disabled' : ''}> ${l.name}`;
+    const on = S.targets.includes(l.code);
+    lab.className = 'chk' + (on ? ' on' : '');
+    lab.title = same ? '지금 말하는 언어입니다. 다른 언어로 말한 사람의 문장만 이 언어로 번역합니다.' : '';
+    lab.innerHTML = `<input type="checkbox" ${on ? 'checked' : ''}> ${l.name}${same ? ' <span class="hint">(말하는 언어)</span>' : ''}`;
     lab.querySelector('input').onchange = e => {
       S.targets = e.target.checked ? [...new Set([...S.targets, l.code])] : S.targets.filter(c => c !== l.code);
       S.targets = LANGS.map(x => x.code).filter(c => S.targets.includes(c));
       store.set('lv-targets', S.targets); renderTargets(); renderExLang();
+      const top = $('log').scrollTop; renderAll(); $('log').scrollTop = top;
+      if (e.target.checked){
+        const n = backfill([l.code]);
+        if (n) toast(`지금까지의 ${n}문장도 ${l.name}로 번역합니다.`);
+      }
     };
     $('targets').append(lab);
   });
@@ -379,7 +393,7 @@ function entryEl(e, i){
   const b = document.createElement('div'); b.className = 'body';
   const o = document.createElement('div'); o.className = 'o'; o.textContent = e.text;
   b.append(o);
-  const langs = LANGS.map(l => l.code).filter(c => c in (e.tr || {}) || (e.pend || []).includes(c) || (e.fail || []).includes(c));
+  const langs = LANGS.map(l => l.code).filter(c => S.targets.includes(c) && (c in (e.tr || {}) || (e.pend || []).includes(c) || (e.fail || []).includes(c)));
   langs.forEach(c => {
     const t = document.createElement('div');
     const tx = document.createElement('span'); tx.className = 'tx';
@@ -571,6 +585,7 @@ function stopUI(){
 }
 $('startBtn').onclick = () => want ? stopListening() : startListening();
 $('nextBtn').onclick = () => {
+  if ($('spkLang').value !== S.src){ $('srcLang').value = $('spkLang').value; $('srcLang').onchange(); }
   if (interimText){ pushPiece(interimText); interimText = ''; }
   flushBuf();
   if (!ses.entries.length){ ses.start = Date.now(); ses.src = S.src; }
@@ -605,12 +620,13 @@ function renderStatus(){
 }
 
 /* ---------- 번역 ---------- */
-const queue = []; let busy = 0;
-function enqueue(i){ const e = ses.entries[i]; if (e && !e.div) queue.push(e); pump(); }
+const queue = []; let busy = 0; const inflight = new Set();
+function enqueue(i){ const e = ses.entries[i]; if (e && !e.div && !queue.includes(e) && !inflight.has(e)) queue.push(e); pump(); }
 function pump(){
   while (busy < 2 && queue.length){
     const i = queue.shift(); busy++;
-    translateEntry(i).catch(console.error).finally(() => { busy--; renderStatus(); pump(); });
+    inflight.add(i);
+    translateEntry(i).catch(console.error).finally(() => { inflight.delete(i); busy--; renderStatus(); if ((i.pend || []).length && ses.entries.includes(i) && !queue.includes(i)) queue.push(i); pump(); });
   }
   renderStatus();
 }
@@ -640,8 +656,8 @@ async function translateEntry(e){
     if (!e.eng) e.eng = 'google';
     else if (e.eng === 'claude' && left.length) e.eng = 'mixed';
   }
-  e.pend = langs.filter(c => e.tr[c] == null && !(e.fail || []).includes(c));
   e.fail = (e.fail || []).filter(c => e.tr[c] == null);
+  e.pend = (e.pend || []).filter(c => e.tr[c] == null && !e.fail.includes(c) && !langs.includes(c));
   const i = ses.entries.indexOf(e);
   if (i >= 0){ updateEntry(i); saveSoon(); }
 }
@@ -726,13 +742,21 @@ function callClaude(body){
   });
 }
 
-$('fillBtn').onclick = () => {
+function backfill(langs){
   let n = 0;
   ses.entries.forEach((e, i) => {
     if (e.div) return;
-    const miss = activeTargets(e.src || srcCode(ses.src || S.src)).filter(c => e.tr[c] == null);
-    if (miss.length && !(e.pend || []).length){ e.pend = miss; e.fail = []; updateEntry(i); enqueue(i); n++; }
+    const sc = e.src || srcCode(ses.src || S.src);
+    const miss = langs.filter(c => c !== sc && e.tr[c] == null && !(e.pend || []).includes(c));
+    if (!miss.length) return;
+    e.pend = [...(e.pend || []), ...miss]; e.fail = (e.fail || []).filter(c => !miss.includes(c));
+    updateEntry(i); enqueue(i); n++;
   });
+  if (n) saveSoon();
+  return n;
+}
+$('fillBtn').onclick = () => {
+  const n = backfill(S.targets);
   toast(n ? `${n}문장의 빠진 번역을 채우고 있습니다.` : '빠진 번역이 없습니다.');
 };
 
@@ -909,7 +933,7 @@ function renderSessions(){
     open.onclick = () => {
       if (want) return toast('먼저 "듣기 멈춤"을 눌러 주세요.');
       archive(); store.set('lv-runAccum-' + ses.id, runAccum);
-      ses = x; runAccum = x.listened || 0; S.src = x.src || S.src; $('srcLang').value = S.src;
+      ses = x; runAccum = x.listened || 0; S.src = x.src || S.src; $('srcLang').value = S.src; $('spkLang').value = S.src;
       store.set('lv-sessions', store.get('lv-sessions', []).filter(y => y.id !== x.id));
       saveNow(); renderTargets(); renderAll(); renderEngine(); renderSessions(); renderStatus();
       $('setPanel').hidden = true; toast('지난 기록을 열었습니다. 이어서 들을 수도 있습니다.');
@@ -962,8 +986,9 @@ $('claudeOn').onchange = () => {
   S.claude = $('claudeOn').checked; store.set('lv-claude', S.claude); renderEngine();
   if (S.claude && !S.key){ $('setPanel').hidden = false; $('apiKey').focus(); }
 };
-$('srcLang').value = S.src;
+$('srcLang').value = S.src; $('spkLang').value = S.src;
 $('srcLang').onchange = () => {
+  $('spkLang').value = $('srcLang').value;
   if (want){ if (interimText){ pushPiece(interimText); interimText = ''; } flushBuf(); }
   S.src = $('srcLang').value; store.set('lv-src', S.src);
   if (!ses.entries.length) ses.src = S.src;
