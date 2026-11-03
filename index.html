@@ -226,8 +226,10 @@
       <button id="cpOrig">📋 원문 복사</button>
       <button id="cpTr">📋 번역 복사</button>
       <button id="cpBoth">📋 원문+번역 복사</button>
-      <button id="dlTxt">⬇️ 텍스트 파일</button>
-      <button id="dlDocx">⬇️ Word 파일</button>
+      <button id="dlDocx">⬇️ Word</button>
+      <button id="dlPdf">⬇️ PDF</button>
+      <button id="dlXlsx">⬇️ Excel</button>
+      <button id="dlTxt">⬇️ 텍스트</button>
       <button id="sendClaude" class="primary" style="background:#c96442;border-color:#c96442">↗ Claude로 보내기</button>
       <button id="sendGpt" class="primary" style="background:#10a37f;border-color:#10a37f">↗ ChatGPT로 보내기</button>
       <button id="sendTr" class="primary">↗ 통·번역기로 보내기</button>
@@ -882,6 +884,94 @@ $('dlTxt').onclick = () => {
   }).join('\n\n');
   download(fileBase() + '.txt', new Blob(['﻿' + header() + '\n\n' + body + '\n'], {type: 'text/plain;charset=utf-8'}));
 };
+/* 공통: 사람·문장 묶음 */
+function rowsForExport(){
+  const out = []; let who = '', no = 0, lang = '';
+  ses.entries.forEach((e, i) => {
+    if (e.div){ no = spkNo(i); who = e.name || ''; lang = e.src; out.push({div: true, title: spkTitle(i), t: e.t, src: e.src}); return; }
+    out.push({no, who, t: e.t, src: e.src || srcCode(ses.src || S.src), text: e.text, tr: e.tr || {}});
+  });
+  return out;
+}
+const usedLangs = () => LANGS.map(l => l.code).filter(c => talk().some(e => e.tr[c] != null));
+
+/* Excel */
+let xlsxLib = null;
+function loadXlsx(){
+  if (window.XLSX) return Promise.resolve();
+  if (xlsxLib) return xlsxLib;
+  xlsxLib = new Promise((ok, no) => {
+    const s = document.createElement('script'); s.src = 'lib/xlsx.mini.min.js';
+    s.onload = ok; s.onerror = () => { xlsxLib = null; no(new Error('xlsx')); };
+    document.head.append(s);
+  });
+  return xlsxLib;
+}
+$('dlXlsx').onclick = async () => {
+  if (!talk().length) return toast('받을 내용이 없습니다.');
+  try{ await loadXlsx(); }catch(e){ return toast('Excel 도구를 불러오지 못했습니다. 다시 눌러 주세요.'); }
+  const m = meta(), langs = usedLangs();
+  const head = ['순서', '말한 사람', '시각', '원문 언어', '원문', ...langs.map(c => L(c).name + ' 번역')];
+  const data = [head];
+  rowsForExport().forEach(r => {
+    if (r.div) return;
+    data.push([r.no || '', r.who, hms(r.t), L(r.src).name, r.text, ...langs.map(c => r.tr[c] != null ? r.tr[c] : '')]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{wch: 6}, {wch: 14}, {wch: 10}, {wch: 10}, {wch: 60}, ...langs.map(() => ({wch: 60}))];
+  ws['!autofilter'] = {ref: XLSX.utils.encode_range({s: {r: 0, c: 0}, e: {r: data.length - 1, c: head.length - 1}})};
+  const info = XLSX.utils.aoa_to_sheet([
+    ['모임명', m.title], ['날짜', dateLabel(m.date)], ['시작 시각', hms(ses.start)], ['장소', m.place], ['대상', m.who],
+    ['말한 사람 수', ses.entries.filter(e => e.div).length || 1], ['문장 수', talk().length],
+    ['원문 언어', [...new Set(talk().map(e => L(e.src || srcCode(ses.src || S.src)).name))].join(', ')],
+    ['번역 언어', langs.map(c => L(c).name).join(', ')],
+  ]);
+  info['!cols'] = [{wch: 14}, {wch: 50}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '기록');
+  XLSX.utils.book_append_sheet(wb, info, '모임 정보');
+  const buf = XLSX.write(wb, {bookType: 'xlsx', type: 'array'});
+  download(fileBase() + '.xlsx', new Blob([buf], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+};
+
+/* PDF: 인쇄 창에서 "PDF로 저장" */
+function pdfHtml(){
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c]);
+  const tm = $('withTime').checked, langs = usedLangs(), m = meta();
+  const [h1, ...rest] = header().split('\n');
+  let body = `<h1>${esc(h1)}</h1>${rest.map(l => `<p class="info">${esc(l)}</p>`).join('')}`;
+  rowsForExport().forEach(r => {
+    if (r.div){ body += `<h2>${esc(r.title)} <small>${hms(r.t)} · ${esc(L(r.src).name)}</small></h2>`; return; }
+    body += `<div class="e">${tm ? `<span class="tm">${hms(r.t)}</span>` : ''}<div class="o">${esc(r.text)}</div>` +
+      langs.filter(c => r.tr[c] != null).map(c => `<div class="t"><b>${L(c).tag}</b> ${esc(r.tr[c])}</div>`).join('') + '</div>';
+  });
+  const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>${esc(fileBase())}</title><style>
+    @page{margin:16mm 14mm}
+    body{font-family:"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR","Microsoft YaHei","PingFang SC",sans-serif;font-size:11pt;line-height:1.55;color:#111}
+    h1{font-size:17pt;margin:0 0 6px} .info{margin:0;color:#555;font-size:9.5pt}
+    h2{font-size:12.5pt;color:#1e4d8c;border-bottom:1.5px solid #1e4d8c;padding-bottom:3px;margin:22px 0 8px;break-after:avoid}
+    h2 small{font-weight:400;color:#666;font-size:9pt}
+    .e{padding:6px 0 7px;border-bottom:1px solid #e5e5e5;break-inside:avoid}
+    .tm{float:left;width:58px;color:#888;font-size:8.5pt;padding-top:2px}
+    .o,.t{margin-left:${tm ? 62 : 0}px} .t{color:#333;margin-top:2px} .t b{color:#1e4d8c;font-size:8pt;margin-right:4px}
+  </style></head><body>${body}</body></html>`;
+  return html;
+}
+$('dlPdf').onclick = () => {
+  if (!talk().length) return toast('받을 내용이 없습니다.');
+  const html = pdfHtml();
+  const fr = document.createElement('iframe');
+  fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  document.body.append(fr);
+  const d = fr.contentWindow.document; d.open(); d.write(html); d.close();
+  const oldTitle = document.title; document.title = fileBase(); // 저장할 때 파일 이름으로 쓰임
+  setTimeout(() => {
+    try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(e){ toast('인쇄 창을 열지 못했습니다.'); }
+    setTimeout(() => { document.title = oldTitle; fr.remove(); }, 1500);
+  }, 300);
+  toast('인쇄 창에서 대상(프린터)을 "PDF로 저장"으로 고르고 저장을 누르세요.');
+};
+
 let docxLib = null;
 function loadDocx(){
   if (window.docx) return Promise.resolve();
