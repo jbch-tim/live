@@ -25,7 +25,7 @@
   button:hover{filter:brightness(.97)}
   button:disabled{opacity:.45;cursor:default}
   button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
-  select,input[type=text],input[type=password],input[type=number],input[type=date]{padding:7px 10px;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:.92em}
+  select,input[type=text],input[type=password],input[type=number],input[type=date],input[type=time]{padding:7px 10px;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:.92em}
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:14px}
   .row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
   .lbl{color:var(--muted);font-size:.85em;min-width:6.5em}
@@ -173,6 +173,8 @@
   .langbtn{border:1px solid var(--line);background:#fff;padding:2px 9px;border-radius:999px;font-size:1em;display:inline-flex;align-items:center;gap:5px;color:var(--ink)}
   .langbtn:hover{border-color:var(--accent);background:#eef4fb;filter:none}
   .langmenu{min-width:220px}
+  .dt3{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:8px}
+  .dt3 label{min-width:0}
   .warnbox{background:#fff4e5;border:1px solid #f5d0a0;border-radius:12px;padding:10px 14px;font-size:.88em;margin-bottom:14px}
   @media (max-width:640px){ .lbl{min-width:0;width:100%} }
 </style>
@@ -221,7 +223,11 @@
         <option value="general">🏢 일반 (강연·회의·세미나 등)</option>
       </select></label>
       <label>모임명<input type="text" id="mTitle" placeholder="예: 정기 모임, 세미나, 강연회"></label>
-      <label>날짜<input type="date" id="mDate"></label>
+      <div class="dt3">
+        <label>날짜<input type="date" id="mDate"></label>
+        <label>시작<input type="time" id="mStart" title="듣기를 처음 시작하면 자동으로 들어갑니다"></label>
+        <label>끝<input type="time" id="mEnd" title="듣기를 멈출 때마다 자동으로 바뀝니다"></label>
+      </div>
       <label>장소<input type="text" id="mPlace" placeholder="예: 본관 2층 회의실"></label>
       <label>대상<input type="text" id="mWho" placeholder="예: 전체, 청년, 새로 온 분들"></label>
     </div>
@@ -810,6 +816,7 @@ function startListening(){
   want = true; restarts = 0; runStart = Date.now();
   if (!ses.entries.length){ ses.start = Date.now(); ses.src = S.src; }
   startRec(false); lockScreen(); recordStart();
+  if (!meta().startT) setMetaTime('startT', hhmm());
   $('startBtn').textContent = '■ 듣기 멈춤'; $('startBtn').classList.add('on');
   renderStatus();
 }
@@ -824,6 +831,7 @@ function stopUI(){
   if (runStart){ runAccum += Date.now() - runStart; runStart = 0; store.set('lv-runAccum-' + ses.id, runAccum); }
   if (wake){ wake.release().catch(() => {}); wake = null; }
   recordPause();
+  if (meta().startT && !(ses.meta || {}).endManual) setMetaTime('endT', hhmm());
   $('startBtn').textContent = '● 듣기 시작'; $('startBtn').classList.remove('on');
   saveNow(); renderStatus();
 }
@@ -1414,8 +1422,11 @@ function meta(){
   const d = new Date(ses.start);
   const m = ses.meta || {};
   return {kind: m.kind || 'church', title: (m.title || '').trim(), date: m.date || `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
-          place: (m.place || '').trim(), who: (m.who || '').trim()};
+          place: (m.place || '').trim(), who: (m.who || '').trim(), startT: m.startT || '', endT: m.endT || ''};
 }
+const hhmm = (t = Date.now()) => { const d = new Date(t); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const timeRange = m => m.startT ? `${m.startT}${m.endT ? '~' + m.endT : ''}` : '';
+function setMetaTime(k, v){ ses.meta = Object.assign({}, ses.meta, {[k]: v}); fillMeta(); saveSoon(); }
 function dateLabel(ymd){
   const d = new Date(ymd + 'T12:00:00');
   return isNaN(d) ? ymd : `${ymd} (${d.toLocaleDateString('ko-KR', {weekday: 'short'})})`;
@@ -1436,8 +1447,8 @@ function header(){
   const srcs = LANGS.map(l => l.code).filter(c => talk().some(e => (e.src || srcCode(ses.src || S.src)) === c));
   const sp = ses.entries.filter(e => e.div).length;
   const m = meta();
-  const info = [`날짜: ${dateLabel(m.date)} ${hms(ses.start).slice(0, 5)}`, m.place && `장소: ${m.place}`, m.who && `대상: ${m.who}`].filter(Boolean).join(' · ');
-  return `${m.title ? m.title + ' — ' : ''}실시간 통역 기록\n${info}\n원문: ${srcs.map(c => L(c).name).join(', ')} · 번역: ${tr.map(c => L(c).name).join(', ')} · ${sp ? sp + '명 · ' : ''}${talk().length}문장`;
+  const info = [`날짜: ${dateLabel(m.date)} ${timeRange(m) || hms(ses.start).slice(0, 5)}`, m.place && `장소: ${m.place}`, m.who && `대상: ${m.who}`].filter(Boolean).join(' · ');
+  return `${m.title ? m.title + ' — ' : ''}실시간 통역 기록\n${info}\n원문: ${srcs.map(c => L(c).name).join(', ')}${tr.length ? ' · 번역: ' + tr.map(c => L(c).name).join(', ') : ''} · ${sp ? sp + '명 · ' : ''}${talk().length}문장`;
 }
 $('dlTxt').onclick = () => {
   if (!ses.entries.length) return toast('받을 내용이 없습니다.');
@@ -1488,7 +1499,7 @@ $('dlXlsx').onclick = async () => {
   ws['!cols'] = [{wch: 6}, {wch: 14}, {wch: 10}, {wch: 10}, {wch: 60}, {wch: 7}, {wch: 40}, ...langs.map(() => ({wch: 60}))];
   ws['!autofilter'] = {ref: XLSX.utils.encode_range({s: {r: 0, c: 0}, e: {r: data.length - 1, c: head.length - 1}})};
   const info = XLSX.utils.aoa_to_sheet([
-    ['모임명', m.title], ['날짜', dateLabel(m.date)], ['시작 시각', hms(ses.start)], ['장소', m.place], ['대상', m.who],
+    ['모임명', m.title], ['날짜', dateLabel(m.date)], ['시작', m.startT || hms(ses.start).slice(0, 5)], ['끝', m.endT], ['장소', m.place], ['대상', m.who],
     ['말한 사람 수', ses.entries.filter(e => e.div).length || 1], ['문장 수', talk().length],
     ['원문 언어', [...new Set(talk().map(e => L(e.src || srcCode(ses.src || S.src)).name))].join(', ')],
     ['번역 언어', langs.map(c => L(c).name).join(', ')],
@@ -1593,7 +1604,7 @@ function chatPrompt(){
   const bibles = langs.concat(srcs).filter((v, i, a) => a.indexOf(v) === i)
     .map(c => `${({ko:'한국어', en:'영어', fr:'프랑스어', zh:'중국어', es:'스페인어'})[c]}: ${L(c).bible}`).join(', ');
   const m = meta();
-  const info = [m.title && `모임: ${m.title}`, `날짜: ${dateLabel(m.date)}`, m.place && `장소: ${m.place}`, m.who && `대상: ${m.who}`].filter(Boolean).join(' / ');
+  const info = [m.title && `모임: ${m.title}`, `날짜: ${dateLabel(m.date)}${timeRange(m) ? ' ' + timeRange(m) : ''}`, m.place && `장소: ${m.place}`, m.who && `대상: ${m.who}`].filter(Boolean).join(' / ');
   const church = m.kind !== 'general';
   return `아래는 ${church ? '교회에서 한' : '모임에서 한'} ${srcs.map(c => K[c]).join('·')} ${church ? '간증(또는 설교)' : '말(강연·발표·대화 등)'}을 음성 인식으로 받아 적은 원문입니다. ${talk().length}문장.
 ${info}
@@ -1640,6 +1651,7 @@ $('clearBtn').onclick = () => {
   buf = ''; interimText = ''; showInterim();
   ses.entries = []; queue.length = 0; ses.active = null;
   ses.start = Date.now(); ses.usage = {in: 0, out: 0, usd: 0, n: 0};
+  ses.meta = Object.assign({}, ses.meta, {startT: '', endT: '', endManual: false}); fillMeta();
   runAccum = 0; if (runStart) runStart = Date.now();
   saveNow(); renderAll(); renderEngine(); renderRoster(); renderStatus();
   toast('기록을 지웠습니다. (모임 정보와 사람 명단은 그대로입니다)');
@@ -1672,7 +1684,7 @@ function renderSessions(){
   list.forEach(x => {
     const li = document.createElement('li');
     const sp = document.createElement('span');
-    sp.textContent = `${(x.meta && x.meta.title) ? x.meta.title + ' · ' : ''}${new Date(x.start).toLocaleString('ko-KR', {dateStyle: 'medium', timeStyle: 'short'})} · ${x.entries.filter(e => !e.div).length}문장 · ${(x.entries.find(e => e.div && e.name) || {}).name || (x.entries.find(e => !e.div) || {}).text || ''}`;
+    sp.textContent = `${(x.meta && x.meta.title) ? x.meta.title + ' · ' : ''}${new Date(x.start).toLocaleDateString('ko-KR', {dateStyle: 'medium'})} ${x.meta && x.meta.startT ? timeRange(x.meta) : hms(x.start).slice(0, 5)} · ${x.entries.filter(e => !e.div).length}문장 · ${(x.entries.find(e => e.div && e.name) || {}).name || (x.entries.find(e => !e.div) || {}).text || ''}`;
     const open = document.createElement('button'); open.textContent = '열기';
     open.onclick = () => {
       if (want) return toast('먼저 "듣기 멈춤"을 눌러 주세요.');
@@ -1762,15 +1774,16 @@ window.addEventListener('beforeunload', e => { if (mr) try{ mr.requestData(); }c
 
 /* ---------- 시작 ---------- */
 if (!SR) $('noSR').hidden = false;
-const MF = {mKind: 'kind', mTitle: 'title', mDate: 'date', mPlace: 'place', mWho: 'who'};
+const MF = {mKind: 'kind', mTitle: 'title', mDate: 'date', mStart: 'startT', mEnd: 'endT', mPlace: 'place', mWho: 'who'};
 function fillMeta(){
   const m = meta();
   Object.entries(MF).forEach(([id, k]) => { $(id).value = m[k] || ''; });
 }
 Object.entries(MF).forEach(([id, k]) => {
-  $(id).addEventListener(id === 'mKind' ? 'change' : 'input', () => {
+  $(id).addEventListener(id === 'mKind' || id === 'mStart' || id === 'mEnd' ? 'change' : 'input', () => {
     ses.meta = Object.assign({}, ses.meta, {[k]: $(id).value});
-    const keep = Object.assign({}, ses.meta); delete keep.date; store.set('lv-meta-last', keep);
+    if (id === 'mEnd') ses.meta.endManual = !!$(id).value;
+    const keep = Object.assign({}, ses.meta); ['date', 'startT', 'endT', 'endManual'].forEach(x => delete keep[x]); store.set('lv-meta-last', keep);
     saveSoon();
   });
 });
