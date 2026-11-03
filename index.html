@@ -120,6 +120,13 @@
   .meta-grid label{display:flex;flex-direction:column;gap:4px;font-size:.82em;color:var(--muted)}
   .meta-grid input{width:100%;font-size:1.05em;color:var(--ink)}
   @media (max-width:640px){ .meta-grid{grid-template-columns:1fr} }
+  .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .bar .ddbtn{font-weight:600}
+  .dd{position:relative}
+  .menu{position:absolute;left:0;bottom:calc(100% + 6px);z-index:30;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:6px;min-width:210px;display:flex;flex-direction:column}
+  .menu button{border:none;background:transparent;text-align:left;padding:9px 12px;border-radius:8px;display:flex;align-items:center;gap:8px;white-space:nowrap}
+  .menu button:hover{background:#eef4fb;filter:none}
+  .menu[hidden]{display:none !important}
   .warnbox{background:#fff4e5;border:1px solid #f5d0a0;border-radius:12px;padding:10px 14px;font-size:.88em;margin-bottom:14px}
   @media (max-width:640px){ .lbl{min-width:0;width:100%} }
 </style>
@@ -205,7 +212,7 @@
       <button id="startBtn" class="bigbtn">● 듣기 시작</button>
       <div class="status" id="status" style="flex:1;min-width:240px"></div>
     </div>
-    <p class="hint" style="margin:10px 0 0">사람이 바뀌면 이름을 쓰고 그 사람의 <b>말하는 언어 국기</b>를 누른 뒤 <b>다음 사람 시작</b>을 누르세요. 듣는 중에도 됩니다.</p>
+    <p class="hint" style="margin:10px 0 0">사람이 바뀌면: 이름 쓰기 → 말하는 언어 국기 → <b>다음 사람 시작</b> (듣는 중에도 됩니다)</p>
   </section>
 
   <!-- 기록 -->
@@ -220,28 +227,35 @@
   <div id="log"><div class="empty" id="emptyMsg">"듣기 시작"을 누르고 말씀을 시작하면 여기에 받아 적고 번역합니다.</div><div class="interim" id="interim"></div></div>
 
   <!-- 끝난 뒤 -->
-  <section class="card" style="margin-top:14px">
-    <div class="row" style="margin-bottom:10px">
-      <span class="lbl">복사·받기</span>
-      <label class="chk"><input type="checkbox" id="withTime" checked> 시각 넣기</label>
-      <select id="exLang"></select>
+  <section class="card bar" style="margin-top:14px">
+    <div class="dd">
+      <button class="ddbtn">📋 복사 ▾</button>
+      <div class="menu" hidden>
+        <button id="cpOrig">원문</button>
+        <div id="cpTrList"></div>
+        <button id="cpBoth">원문 + 번역 모두</button>
+      </div>
     </div>
-    <div class="tools">
-      <button id="cpOrig">📋 원문 복사</button>
-      <button id="cpTr">📋 번역 복사</button>
-      <button id="cpBoth">📋 원문+번역 복사</button>
-      <button id="dlDocx">⬇️ Word</button>
-      <button id="dlPdf">⬇️ PDF</button>
-      <button id="dlXlsx">⬇️ Excel</button>
-      <button id="dlTxt">⬇️ 텍스트</button>
-      <button id="sendClaude" class="primary" style="background:#c96442;border-color:#c96442">↗ Claude로 보내기</button>
-      <button id="sendGpt" class="primary" style="background:#10a37f;border-color:#10a37f">↗ ChatGPT로 보내기</button>
-      <button id="sendTr" class="primary">↗ 통·번역기로 보내기</button>
-      <button id="fillBtn">↻ 빠진 번역 채우기</button>
-      <button id="newBtn" style="margin-left:auto">🆕 새로 시작</button>
+    <div class="dd">
+      <button class="ddbtn">⬇️ 저장 ▾</button>
+      <div class="menu" hidden>
+        <button id="dlDocx">Word 파일</button>
+        <button id="dlPdf">PDF 파일</button>
+        <button id="dlXlsx">Excel 파일</button>
+        <button id="dlTxt">텍스트 파일</button>
+      </div>
     </div>
-    <p class="hint" style="margin-bottom:0"><b>Claude·ChatGPT로 보내기</b>: 받아 적은 원문 전체와 번역 부탁 글을 함께 복사하고 새 대화를 엽니다. 입력칸에 붙여넣기(맥 ⌘V, 윈도우 Ctrl+V) 한 뒤 보내기만 누르세요. 구독 안에서 하는 것이라 따로 돈이 들지 않습니다.<br>
-    <b>통·번역기로 보내기</b>: 원문을 복사한 뒤 통·번역기를 엽니다. <b>파일·붙여넣기</b> 칸에 붙여넣으시면 됩니다.</p>
+    <div class="dd">
+      <button class="ddbtn">↗ 보내기 ▾</button>
+      <div class="menu" hidden>
+        <button id="sendClaude">Claude로 정리·번역</button>
+        <button id="sendGpt">ChatGPT로 정리·번역</button>
+        <button id="sendTr">다국어 통·번역기로</button>
+        <p class="hint" style="margin:6px 10px 4px;max-width:250px">글을 복사하고 새 탭을 엽니다. 입력칸에 붙여넣고(⌘V / Ctrl+V) 보내세요.</p>
+      </div>
+    </div>
+    <label class="hint" style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="withTime" checked style="margin:0"> 시각 포함</label>
+    <button id="newBtn" style="margin-left:auto">🆕 새로 시작</button>
   </section>
 </main>
 
@@ -385,8 +399,8 @@ function spkTitle(i){ const d = ses.entries[i]; return `${spkNo(i)}번째 순서
 function renderExLang(){
   const langs = new Set(activeTargets());
   ses.entries.forEach(e => Object.keys(e.tr || {}).forEach(c => langs.add(c)));
-  const cur = $('exLang').value || $('stageLang').value;
-  [$('exLang'), $('stageLang')].forEach(sel => {
+  const cur = $('stageLang').value;
+  [$('stageLang')].forEach(sel => {
     const keep = sel.value;
     sel.innerHTML = '';
     LANGS.filter(l => langs.has(l.code)).forEach(l => sel.add(new Option(`번역: ${l.name}`, l.code)));
@@ -808,10 +822,6 @@ function backfill(langs){
   if (n) saveSoon();
   return n;
 }
-$('fillBtn').onclick = () => {
-  const n = backfill(S.targets);
-  toast(n ? `${n}문장의 빠진 번역을 채우고 있습니다.` : '빠진 번역이 없습니다.');
-};
 
 /* ---------- 크게 보기 ---------- */
 function renderStage(){
@@ -839,21 +849,40 @@ $('stUp').onclick = () => { S.stage = Math.min(9, +(S.stage + .4).toFixed(1)); s
 $('stDown').onclick = () => { S.stage = Math.max(2, +(S.stage - .4).toFixed(1)); store.set('lv-stage', S.stage); renderStage(); };
 
 /* ---------- 복사·파일 ---------- */
-function lines(kind){
-  const tm = $('withTime').checked, c = $('exLang').value;
+function lines(kind, c){
+  const tm = $('withTime').checked, all = usedLangs();
   return ses.entries.map((e, i) => {
     if (e.div) return `\n=== ${spkTitle(i)} ===`;
     const p = tm ? `[${hms(e.t)}] ` : '';
     const tr = c && e.tr[c] != null ? e.tr[c] : '';
     if (kind === 'orig') return p + e.text;
     if (kind === 'tr') return tr ? p + tr : '';
-    return p + e.text + (tr ? '\n' + (tm ? ' '.repeat(p.length) : '') + tr : '');
+    return p + e.text + all.filter(x => e.tr[x] != null).map(x => `\n${tm ? ' '.repeat(p.length) : ''}${L(x).tag}: ${e.tr[x]}`).join('');
   }).filter(Boolean).join(kind === 'both' ? '\n\n' : '\n').trim();
 }
-const langName = () => { const c = $('exLang').value; return c ? L(c).name : ''; };
 $('cpOrig').onclick = () => copyText(lines('orig'), '원문을');
-$('cpTr').onclick = () => $('exLang').value ? copyText(lines('tr'), `${langName()} 번역을`) : toast('번역이 없습니다.');
 $('cpBoth').onclick = () => copyText(lines('both'), '원문과 번역을');
+function renderCopyMenu(){
+  const box = $('cpTrList'); box.innerHTML = '';
+  usedLangs().forEach(c => {
+    const b = document.createElement('button');
+    b.innerHTML = `${flagImg(L(c).flag)} ${L(c).name} 번역`;
+    b.onclick = () => { copyText(lines('tr', c), `${L(c).name} 번역을`); closeMenus(); };
+    box.append(b);
+  });
+}
+function closeMenus(){ document.querySelectorAll('.menu').forEach(m => m.hidden = true); }
+document.querySelectorAll('.dd').forEach(dd => {
+  const btn = dd.querySelector('.ddbtn'), menu = dd.querySelector('.menu');
+  btn.onclick = ev => {
+    ev.stopPropagation();
+    const open = menu.hidden; closeMenus();
+    if (open){ if (menu.contains($('cpTrList'))) renderCopyMenu(); menu.hidden = false; }
+  };
+  menu.addEventListener('click', ev => { if (ev.target.closest('button')) setTimeout(closeMenus, 0); });
+});
+document.addEventListener('click', ev => { if (!ev.target.closest('.dd')) closeMenus(); });
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeMenus(); });
 
 function meta(){
   const d = new Date(ses.start);
