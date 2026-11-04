@@ -334,6 +334,13 @@
   .tgt .flag{width:18px;height:13px;margin-left:2px}
   .pchip .tgt .flag{width:18px;height:13px}
   .spk .cp{color:#4b6a95}
+  .ctog{width:100%;display:flex;align-items:center;gap:8px;border:none;background:transparent;padding:0;font-weight:700;font-size:1em;text-align:left;color:var(--ink)}
+  .ctog:hover{filter:none;color:var(--accent)}
+  .ctog .sum{font-weight:400;color:var(--muted);font-size:.88em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+  .ctog .arr{margin-left:auto;color:var(--muted);font-weight:400;font-size:.88em;flex:none}
+  #metaBody{margin-top:12px}
+  body.no-help .help{display:none !important}
+  #helpBtn.off{opacity:.6}
   .warnbox{background:#fff4e5;border:1px solid #f5d0a0;border-radius:12px;padding:10px 14px;font-size:.88em;margin-bottom:14px}
   @media (max-width:640px){ .lbl{min-width:0;width:100%} }
 </style>
@@ -345,6 +352,7 @@
   <button id="fsDown" title="글자 작게">가−</button>
   <button id="fsUp" title="글자 크게">가+</button>
   <button id="stageBtn" hidden title="번역을 크게 띄우기">🖥️ 크게 보기</button>
+  <button id="helpBtn" title="설명 글 보이기·숨기기">ⓘ 설명</button>
   <button id="setBtn">⚙️ 설정</button>
 </header>
 
@@ -396,8 +404,8 @@
   <div id="liveMode">
   <!-- 모임 정보 -->
   <section class="card">
-    <h2 class="ctitle">📋 모임 정보 <span class="hint" style="font-weight:400">— 파일 이름·머리말과 번역할 때 쓰입니다</span></h2>
-    <div class="meta-grid">
+    <button class="ctog" id="metaTog"></button>
+    <div class="meta-grid" id="metaBody">
       <label>모임 종류<select id="mKind" style="width:100%;font-size:1.05em;color:var(--ink)">
         <option value="church">⛪ 교회 모임 (간증·나눔·성경공부)</option>
         <option value="sermon">📖 설교 (성경강연 포함)</option>
@@ -416,7 +424,7 @@
 
   <!-- 말하는 사람 -->
   <section class="card">
-    <h2 class="ctitle">👥 말하는 사람 <span class="hint" style="font-weight:400">— 이름 · 말하는 언어 → 번역할 언어</span></h2>
+    <h2 class="ctitle">👥 말하는 사람 <span class="hint help" style="font-weight:400">— 이름 · 말하는 언어 → 번역할 언어</span></h2>
     <div id="roster" class="row" style="gap:8px"></div>
     <div id="addForm" class="addform" hidden>
       <div class="af-row"><span class="af-l">이름</span><input type="text" id="newName" placeholder="예: 최승돈" style="width:14em"></div>
@@ -431,7 +439,7 @@
     <div class="row" style="margin-bottom:12px">
       <span class="lbl">더 번역할 언어</span>
       <span id="targets" class="row" style="gap:8px"></span>
-      <span class="hint" style="flex-basis:100%">사람마다 정한 번역 말고도, 여기서 고른 언어로 모든 문장을 더 번역합니다.</span>
+      <span class="hint help" style="flex-basis:100%">사람마다 정한 번역 말고도, 여기서 고른 언어로 모든 문장을 더 번역합니다.</span>
     </div>
     <div class="row" style="margin-bottom:12px" id="srcRow">
       <span class="lbl">말하는 언어</span>
@@ -519,7 +527,7 @@
     <div class="row" style="gap:14px">
       <label class="switch"><input type="checkbox" id="cvClaude"><span class="track"></span><span>Claude 실시간 번역</span></label>
       <label class="switch"><input type="checkbox" id="cvSpeak"><span class="track"></span><span>🔊 소리 내어 읽기</span></label>
-      <span id="cvNote" class="hint" style="flex-basis:100%"></span>
+      <span id="cvNote" class="hint help" style="flex-basis:100%"></span>
     </div>
     <div class="row cv-vol" style="margin-top:8px">
       <span class="cv-vl">🔊 읽는 소리</span>
@@ -531,7 +539,7 @@
       <span class="cv-vl">🎤 마이크</span>
       <span class="cv-meter"><i id="cvMicLvl"></i></span>
       <button id="cvMicTest" class="cv-small">마이크 확인</button>
-      <span class="hint" style="flex-basis:100%">소리가 작게 잡히면 맥 <b>시스템 설정 → 사운드 → 입력</b>에서 입력 음량을 올리세요. (웹앱은 마이크 크기를 직접 바꿀 수 없습니다)</span>
+      <span class="hint help" style="flex-basis:100%">소리가 작게 잡히면 맥 <b>시스템 설정 → 사운드 → 입력</b>에서 입력 음량을 올리세요. (웹앱은 마이크 크기를 직접 바꿀 수 없습니다)</span>
     </div>
     </div>
   </section>
@@ -563,7 +571,7 @@
   <div class="cv-grip top" id="cvDockGrip" title="끌어서 입력창 높이 조절"><span></span></div>
   <div class="cv-tools">
     <button id="cvLayoutBtn" class="cv-small" title="입력칸을 나란히 또는 위아래로">⇆ 나란히</button>
-    <span class="hint cv-tip">위 막대·가운데 막대를 끌어서 크기를 바꿉니다</span>
+    <span class="hint cv-tip help">위 막대·가운데 막대를 끌어서 크기를 바꿉니다</span>
     <span id="cvListen" class="cv-listen"></span>
     <span class="cv-meter mini" title="마이크 소리 크기"><i id="cvMicLvl2"></i></span>
   </div>
@@ -1169,14 +1177,14 @@ function renderRecNote(){
   if (ses.hasAudio || mr){
     const live = mr && mr.state === 'recording';
     if (n.dataset.mode !== (live ? 'live' : 'have')){
-      n.dataset.mode = live ? 'live' : 'have';
+      n.dataset.mode = live ? 'live' : 'have'; n.classList.remove('help');
       n.innerHTML = `<span id="recTime"></span> <button id="recGet">⬇ 받기</button> <button id="recDel" class="clearbtn">🗑 녹음 지우기</button>`;
       $('recGet').onclick = () => $('dlAudio').click();
       $('recDel').onclick = deleteRecording;
     }
     $('recTime').innerHTML = `${live ? '<b style="color:var(--red)">● 녹음 중</b>' : '녹음 있음'} <span class="timer">${dur(recMs())}</span>`;
   } else if (n.dataset.mode !== 'none'){
-    n.dataset.mode = 'none';
+    n.dataset.mode = 'none'; n.classList.add('help');
     n.textContent = '듣는 동안 목소리를 녹음해서, 끝난 뒤 ⬇️ 저장 → 녹음 파일로 받습니다.';
   }
 }
@@ -2208,19 +2216,34 @@ window.addEventListener('beforeunload', e => { if (mr) try{ mr.requestData(); }c
 
 /* ---------- 시작 ---------- */
 if (!SR) $('noSR').hidden = false;
+S.metaOpen = store.get('lv-metaOpen', true);
+function renderMetaTog(){
+  const m = meta();
+  const kind = {church: '⛪ 교회 모임', sermon: '📖 설교', general: '🏢 일반'}[m.kind] || '';
+  const sum = [kind, m.title, `${dateLabel(m.date)}${timeRange(m) ? ' ' + timeRange(m) : ''}`, m.place, m.who].filter(Boolean).join(' · ');
+  $('metaTog').innerHTML = `📋 모임 정보 <span class="sum"></span><span class="arr">${S.metaOpen ? '▴ 닫기' : '▾ 열기'}</span>`;
+  $('metaTog').querySelector('.sum').textContent = S.metaOpen ? '' : sum;
+  $('metaBody').hidden = !S.metaOpen;
+}
+$('metaTog').onclick = () => { S.metaOpen = !S.metaOpen; store.set('lv-metaOpen', S.metaOpen); renderMetaTog(); };
+S.help = store.get('lv-help', true);
+function applyHelp(){ document.body.classList.toggle('no-help', !S.help); $('helpBtn').classList.toggle('off', !S.help); $('helpBtn').textContent = S.help ? 'ⓘ 설명 숨기기' : 'ⓘ 설명 보기'; if (typeof cvFit === 'function') cvFit(); }
+$('helpBtn').onclick = () => { S.help = !S.help; store.set('lv-help', S.help); applyHelp(); };
 const MF = {mKind: 'kind', mTitle: 'title', mDate: 'date', mStart: 'startT', mEnd: 'endT', mPlace: 'place', mWho: 'who'};
 function fillMeta(){
   const m = meta();
   Object.entries(MF).forEach(([id, k]) => { $(id).value = m[k] || ''; });
+  renderMetaTog();
 }
 Object.entries(MF).forEach(([id, k]) => {
   $(id).addEventListener(id === 'mKind' || id === 'mStart' || id === 'mEnd' ? 'change' : 'input', () => {
     ses.meta = Object.assign({}, ses.meta, {[k]: $(id).value});
     if (id === 'mEnd') ses.meta.endManual = !!$(id).value;
     const keep = Object.assign({}, ses.meta); ['date', 'startT', 'endT', 'endManual'].forEach(x => delete keep[x]); store.set('lv-meta-last', keep);
-    saveSoon();
+    saveSoon(); renderMetaTog();
   });
 });
+applyHelp();
 $('withTime').checked = store.get('lv-withTime', true);
 document.body.classList.toggle('no-time', !$('withTime').checked);
 $('withTime').onchange = () => {
