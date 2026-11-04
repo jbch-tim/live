@@ -52,7 +52,8 @@
   .chk.off{opacity:.35;pointer-events:none}
   .chk.on{border-color:var(--accent);background:#eef4fb}
   .flag{width:24px;height:18px;border-radius:3px;box-shadow:0 0 0 1px rgba(0,0,0,.12);object-fit:cover;flex:none;vertical-align:middle}
-  .fbtn{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:#fff;cursor:pointer;user-select:none;font-size:.92em}
+  .fbtn{display:inline-flex;align-items:center;gap:clamp(4px,.5vw,7px);padding:clamp(3px,.45vw,6px) clamp(7px,.9vw,12px);border:1px solid var(--line);border-radius:999px;background:#fff;cursor:pointer;user-select:none;font-size:clamp(12px,.35vw + 10px,15px)}
+  .fbtn .flag{width:clamp(18px,1.6vw,24px);height:auto;aspect-ratio:4/3}
   .fbtn input{display:none}
   .fbtn.on{border-color:var(--accent);background:#eef4fb;box-shadow:0 0 0 1px var(--accent) inset;font-weight:600}
   .fbtn.on.src{border-color:var(--red);background:#fdf0ee;box-shadow:0 0 0 1px var(--red) inset}
@@ -67,7 +68,9 @@
   .switch input:checked + .track::after{left:23px}
   .cost{font-size:.85em;color:var(--gold)}
   /* 큰 시작 버튼 */
-  .bigbtn{font-size:1.1em;padding:12px 26px;border-radius:14px;font-weight:700;border:none;color:#fff;background:var(--red)}
+  .bigbtn{font-size:clamp(14px,.6vw + 11px,19px);padding:clamp(7px,.9vw,12px) clamp(14px,2vw,26px);border-radius:14px;font-weight:700;border:none;color:#fff;background:var(--red)}
+  button{font-size:clamp(12px,.3vw + 10px,15px)}
+  .seg button,.go,.del,.cv-small{font-size:clamp(12px,.3vw + 10px,14.5px)}
   .bigbtn.on{background:#374151}
   .live-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#9ca3af;margin-right:6px;vertical-align:middle}
   .live-dot.on{background:var(--red);animation:blink 1.2s infinite}
@@ -282,7 +285,11 @@
   .cv-hist.closed{flex:none}
   #cvHistWrap{flex:1;min-height:0;display:flex;flex-direction:column}
   #convMode{overflow:hidden}
-  #cvHistGrip{flex:none;height:12px}
+  .cv-mid{flex:none;display:flex;align-items:center;gap:8px}
+  .cv-mid .cv-grip{flex:1;height:22px}
+  .cv-midb{display:flex;gap:4px}
+  .cv-midb button{padding:3px 9px;border-radius:8px;font-size:clamp(11px,.25vw + 10px,13px)}
+  @media (max-width:700px){ #cvBig{font-size:0} #cvBig::after{content:'▲';font-size:13px} }
   .cv-vl{min-width:6.5em;font-weight:600;font-size:.92em}
   #cvVol{flex:1;max-width:260px;accent-color:var(--accent)}
   .cv-meter{display:inline-block;width:160px;height:10px;border-radius:6px;background:#e5e0d6;overflow:hidden;vertical-align:middle}
@@ -392,9 +399,9 @@
     <h2 class="ctitle">📋 모임 정보 <span class="hint" style="font-weight:400">— 파일 이름·머리말과 번역할 때 쓰입니다</span></h2>
     <div class="meta-grid">
       <label>모임 종류<select id="mKind" style="width:100%;font-size:1.05em;color:var(--ink)">
-        <option value="church">⛪ 간증·나눔 (교회 모임)</option>
-        <option value="sermon">📖 설교·성경강연</option>
-        <option value="general">🏢 일반 (강연·회의·세미나 등)</option>
+        <option value="church">⛪ 교회 모임 (간증·나눔·성경공부)</option>
+        <option value="sermon">📖 설교 (성경강연 포함)</option>
+        <option value="general">🏢 일반 (강연·회의 등)</option>
       </select></label>
       <label>모임명<input type="text" id="mTitle" placeholder="예: 정기 모임, 세미나, 강연회"></label>
       <div class="dt3">
@@ -531,7 +538,11 @@
 
   <section class="cv-stream" id="cvStream"><div class="cv-empty" id="cvEmpty">아래 입력창에 말하거나 쓰면, 통역된 대화가 여기에 차례로 올라갑니다.</div></section>
 
-  <div class="cv-grip" id="cvHistGrip" title="끌어서 대화 창과 대화 기록 크기 조절"><span></span></div>
+  <div class="cv-mid">
+    <span class="cv-midb"><button id="cvFzDown" title="대화 글씨 작게">가−</button><button id="cvFzUp" title="대화 글씨 크게">가+</button></span>
+    <div class="cv-grip" id="cvHistGrip" title="끌어서 대화 창과 대화 기록 크기 조절"><span></span></div>
+    <span class="cv-midb"><button id="cvBig" title="대화 창을 크게 (기록 칸을 줄임)">▲ 대화 창 크게</button><button id="cvSmall" title="대화 창을 작게 (기록 칸을 늘림)">▼ 작게</button></span>
+  </div>
   <section class="card cv-hist">
     <div class="cv-hh">
       <button id="cvHistToggle" class="cv-small">▾ 대화 기록</button>
@@ -1096,7 +1107,15 @@ function stopUI(){
   $('startBtn').textContent = '● 듣기 시작'; $('startBtn').classList.remove('on');
   saveNow(); renderStatus();
 }
-$('startBtn').onclick = () => { want ? stopListening() : startListening(); renderRoster(); };
+$('startBtn').onclick = () => {
+  if (want){ stopListening(); renderRoster(); return; }
+  const ld = lastDivider(), p = ld && ld.spk ? roster().find(x => x.id === ld.spk) : null;
+  if (p){ selectSpeaker(p); return; }               // 마지막 사람 이어서
+  if (roster().length){ selectSpeaker(roster()[0]); return; }
+  // 명단이 비어 있으면 한국어로 말하는 사람 한 명을 만들어서 시작 (이름·언어는 나중에 고칠 수 있음)
+  const np = {id: Date.now(), name: '', lang: 'ko-KR', targets: S.targets.filter(c => c !== 'ko')};
+  roster().push(np); saveNow(); renderRoster(); selectSpeaker(np);
+};
 /* ---------- 녹음 ---------- */
 S.record = store.get('lv-record', false);
 let mr = null, mrStream = null, mrSeg = 0, mrIdx = 0, mrMime = '', recRun = ses.recMs || 0, recStart = 0, recBytes = 0;
@@ -1234,7 +1253,7 @@ function renderRoster(){
   const add = document.createElement('button'); add.className = 'pchip addchip'; add.textContent = '+ 사람 추가';
   add.onclick = () => openAdd(null);
   box.append(add);
-  $('srcRow').hidden = roster().length > 0;  // 명단이 있으면 언어는 사람마다 정해져 있음
+  $('srcRow').hidden = true;  // 말하는 언어는 사람마다 정함
   renderUpcoming();
   $('emptyMsg').hidden = ses.entries.length > 0 || roster().length > 0;
   [...$('log').querySelectorAll(':scope > .spk')].forEach(n => { const k = +n.dataset.i; if (ses.entries[k]) n.replaceWith(entryEl(ses.entries[k], k)); });
@@ -2240,7 +2259,7 @@ const CV = {
   speak: store.get('cv-speak', true),
   layout: store.get('cv-layout', innerWidth < 700 ? 'stack' : 'side'),
   ratio: store.get('cv-ratio', 0.5),
-  boxH: store.get('cv-boxH2', innerWidth < 700 ? 300 : 210),
+  boxH: store.get('cv-boxH2', innerWidth < 700 ? 280 : 180),
   histH: store.get('cv-histH', 120),
   histOpen: store.get('cv-histOpen', innerWidth >= 700),
   turns: store.get('cv-turns', []),
@@ -2362,7 +2381,7 @@ function cvLangChanged(){
   cvRenderTop();
   if (cvSide === 'them'){ cvCloseRec(); cvOpenRec(); }   // 듣는 중이면 새 언어로 다시 듣기
 }
-CV.topOpen = store.get('cv-topOpen', true);
+CV.topOpen = store.get('cv-topOpen', false);
 const cvTopShown = () => document.body.classList.contains('cv-focus') ? document.body.classList.contains('show-top') : CV.topOpen;
 $('cvTopToggle').onclick = () => {
   if (document.body.classList.contains('cv-focus')) document.body.classList.toggle('show-top');   // 입력 중에는 잠깐만 열기
@@ -2433,6 +2452,21 @@ dragger($('cvHistGrip'), e => {   // 위로 끌면 기록 칸이 커지고 대�
   const bottom = $('convMode').getBoundingClientRect().bottom - 14;
   CV.histH = Math.max(50, bottom - e.clientY - 50); cvApplyLayout();
 }, () => store.set('cv-histH', CV.histH));
+CV.fz = store.get('cv-fz', 1);
+$('cvFzUp').onclick = () => { CV.fz = Math.min(1.8, +(CV.fz + .1).toFixed(2)); store.set('cv-fz', CV.fz); cvRenderStream(); };
+$('cvFzDown').onclick = () => { CV.fz = Math.max(.6, +(CV.fz - .1).toFixed(2)); store.set('cv-fz', CV.fz); cvRenderStream(); };
+$('cvBig').onclick = () => {   // 위 언어 칸을 접고 → 기록 칸을 줄이고 → 다 줄면 접기
+  if (CV.topOpen || document.body.classList.contains('show-top')){ CV.topOpen = false; store.set('cv-topOpen', false); document.body.classList.remove('show-top'); cvRenderTop(); return; }
+  if (CV.histOpen && CV.histH > 90){ CV.histH = Math.max(60, CV.histH - 80); }
+  else if (CV.histOpen){ CV.histOpen = false; }
+  else if (CV.boxH > 150){ CV.boxH = Math.max(130, CV.boxH - 40); store.set('cv-boxH2', CV.boxH); }
+  store.set('cv-histH', CV.histH); store.set('cv-histOpen', CV.histOpen); cvApplyLayout();
+};
+$('cvSmall').onclick = () => {
+  if (!CV.histOpen){ CV.histOpen = true; CV.histH = Math.max(CV.histH, 80); }
+  else CV.histH = Math.min(innerHeight * .6, CV.histH + 80);
+  store.set('cv-histH', CV.histH); store.set('cv-histOpen', CV.histOpen); cvApplyLayout();
+};
 $('cvHistToggle').onclick = () => { CV.histOpen = !CV.histOpen; store.set('cv-histOpen', CV.histOpen); cvApplyLayout(); };
 
 /* --- 말하기: 한 번 누르면 계속 듣고, 말을 멈출 때마다 자동 통역. 다시 누르면 멈춤 --- */
@@ -2598,9 +2632,9 @@ function cvSayUI(){ document.querySelectorAll('.cv-say, .cv-say-mini').forEach(b
 /* --- 글 길이에 맞춰 글씨 크기 --- */
 function cvFontSize(text){
   const n = [...(text || '')].length;
-  const base = n <= 12 ? 40 : n <= 25 ? 34 : n <= 50 ? 29 : n <= 90 ? 25 : n <= 160 ? 21 : n <= 280 ? 18 : 16;
+  const base = (n <= 12 ? 40 : n <= 25 ? 34 : n <= 50 ? 29 : n <= 90 ? 25 : n <= 160 ? 21 : n <= 280 ? 18 : 16) * (CV.fz || 1);
   const scale = Math.min(1, Math.max(.6, innerWidth / 900));
-  return Math.round(Math.max(15, base * scale));
+  return Math.round(Math.max(13, base * scale));
 }
 
 /* --- 화면 그리기 --- */
