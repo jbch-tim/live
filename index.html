@@ -83,7 +83,7 @@
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
   .seg button{border:none;border-radius:0;padding:7px 12px}
   .seg button.on{background:var(--accent);color:#fff}
-  #log{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:6px 16px;min-height:220px;max-height:62vh;overflow:auto;scroll-behavior:smooth}
+  #log{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:6px 16px;min-height:220px}
   .ent{padding:10px 0;border-bottom:1px solid var(--line);display:grid;gap:2px 12px}
   .ent:last-child{border-bottom:none}
   .spk{margin:14px 0 4px;padding:8px 12px;border-radius:10px;background:#eef4fb;border:1px solid #c9d9ee;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:.9em}
@@ -215,7 +215,11 @@
   body.mode-live .cv-dock{display:none !important}
   .cv-small{padding:6px 12px;font-size:.88em}
   /* 대화가 위로 올라가는 창 */
-  .cv-stream{display:flex;flex-direction:column;gap:12px;overflow-y:auto;padding:6px 4px 10px;height:var(--sh,50vh);min-height:180px;scroll-behavior:smooth;
+  body.mode-conv{overflow:hidden}
+  #convMode{position:fixed;left:0;right:0;top:var(--cvTop,60px);bottom:var(--cvBot,240px);max-width:1000px;margin:0 auto;padding:8px 10px 6px;display:flex;flex-direction:column;gap:6px;z-index:5}
+  #convMode[hidden]{display:none}
+  #cvTop{flex:none;margin:0}
+  .cv-stream{display:flex;flex-direction:column;gap:12px;overflow-y:auto;padding:6px 4px 10px;flex:1 1 0;min-height:90px;scroll-behavior:smooth;
     -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 40px);mask-image:linear-gradient(to bottom,transparent 0,#000 40px)}
   .cv-empty{margin:auto;color:var(--muted);text-align:center;padding:20px}
   .cv-b{max-width:88%;display:flex;flex-direction:column;gap:4px}
@@ -274,9 +278,19 @@
   .cv-grip.top{height:16px}
   .cv-grip span{width:56px;height:5px;border-radius:4px;background:#cfc8bb}
   /* 대화 기록 */
-  .cv-hist{margin-top:10px}
+  .cv-hist{flex:0 1 calc(var(--hh,140px) + 52px);min-height:46px;margin:0;padding:8px 12px;display:flex;flex-direction:column;overflow:hidden}
+  .cv-hist.closed{flex:none}
+  #cvHistWrap{flex:1;min-height:0;display:flex;flex-direction:column}
+  #convMode{overflow:hidden}
+  #cvHistGrip{flex:none;height:12px}
+  .cv-vl{min-width:6.5em;font-weight:600;font-size:.92em}
+  #cvVol{flex:1;max-width:260px;accent-color:var(--accent)}
+  .cv-meter{display:inline-block;width:160px;height:10px;border-radius:6px;background:#e5e0d6;overflow:hidden;vertical-align:middle}
+  .cv-meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,#1f7a4d,#d9a406 70%,#c0392b);transition:width .08s}
+  .cv-meter.mini{width:70px;height:8px}
+  .cv-meter.mini:not(.on){display:none}
   .cv-hh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  #cvHist{height:var(--hh,260px);overflow:auto;margin-top:8px;border-top:1px solid var(--line)}
+  #cvHist{flex:1;min-height:0;overflow:auto;margin-top:6px;border-top:1px solid var(--line)}
   .cv-h{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;padding:8px 0 8px 8px;border-bottom:1px solid var(--line)}
   .cv-h .tm{color:var(--muted);font-size:.75em;padding-top:.3em;font-variant-numeric:tabular-nums}
   .cv-h .o{font-size:.9em;color:var(--muted)}
@@ -296,6 +310,7 @@
     main{padding:10px 8px 60px}
     .cv-tip{display:none}
     .cv-b{max-width:94%}
+    .cv-toptog .hint{display:none}
     #cvTop{padding:8px 10px}
     #cvTop .lbl{display:none}
     #cvLangs{flex-wrap:nowrap;overflow-x:auto;width:100%;padding-bottom:2px;-webkit-overflow-scrolling:touch}
@@ -305,6 +320,13 @@
     #cvNote{display:none}
     .cv-panels.side .cv-ph .hint{display:none}
   }
+  .af-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%}
+  .af-l{min-width:6.5em;color:var(--muted);font-size:.85em}
+  .addform{flex-direction:column;align-items:stretch}
+  .tgt{white-space:nowrap}
+  .tgt .flag{width:18px;height:13px;margin-left:2px}
+  .pchip .tgt .flag{width:18px;height:13px}
+  .spk .cp{color:#4b6a95}
   .warnbox{background:#fff4e5;border:1px solid #f5d0a0;border-radius:12px;padding:10px 14px;font-size:.88em;margin-bottom:14px}
   @media (max-width:640px){ .lbl{min-width:0;width:100%} }
 </style>
@@ -325,6 +347,17 @@
   <!-- 설정 -->
   <section class="card panel" id="setPanel" hidden>
     <h2>⚙️ 설정</h2>
+    <div class="row" style="margin-bottom:12px">
+      <span class="lbl">실시간 번역 방식</span>
+      <span class="seg" id="engSeg">
+        <button data-e="google">무료 Google</button>
+        <button data-e="gemini">Gemini <small>무료</small></button>
+        <button data-e="claude">Claude <small>유료</small></button>
+      </span>
+      <label id="polishWrap" class="chk" title="앞 문맥을 보고 잘못 알아들은 말을 바로잡습니다. 들은 그대로의 말도 함께 남깁니다."><input type="checkbox" id="polishOn"> ✨ 문장 다듬기</label>
+      <span id="engineNote" class="hint"></span>
+    </div>
+    <p class="hint" style="margin-top:-6px">무료 Google: 바로 번역 · Gemini: Google 번역 뒤 20초마다 다듬음(무료 키) · Claude: 문장마다 Claude가 번역(유료 키)</p>
     <p class="row"><span class="lbl">Gemini 무료 키</span>
       <input type="password" id="gKey" placeholder="AIza…" style="flex:1;min-width:220px" autocomplete="off">
       <button id="gSave" class="primary">저장</button>
@@ -359,7 +392,8 @@
     <h2 class="ctitle">📋 모임 정보 <span class="hint" style="font-weight:400">— 파일 이름·머리말과 번역할 때 쓰입니다</span></h2>
     <div class="meta-grid">
       <label>모임 종류<select id="mKind" style="width:100%;font-size:1.05em;color:var(--ink)">
-        <option value="church">⛪ 교회 (간증·설교·성경공부)</option>
+        <option value="church">⛪ 간증·나눔 (교회 모임)</option>
+        <option value="sermon">📖 설교·성경강연</option>
         <option value="general">🏢 일반 (강연·회의·세미나 등)</option>
       </select></label>
       <label>모임명<input type="text" id="mTitle" placeholder="예: 정기 모임, 세미나, 강연회"></label>
@@ -373,9 +407,25 @@
     </div>
   </section>
 
-  <!-- 듣기·번역 -->
+  <!-- 말하는 사람 -->
   <section class="card">
-    <h2 class="ctitle">🎧 듣기·번역</h2>
+    <h2 class="ctitle">👥 말하는 사람 <span class="hint" style="font-weight:400">— 이름 · 말하는 언어 → 번역할 언어</span></h2>
+    <div id="roster" class="row" style="gap:8px"></div>
+    <div id="addForm" class="addform" hidden>
+      <div class="af-row"><span class="af-l">이름</span><input type="text" id="newName" placeholder="예: 최승돈" style="width:14em"></div>
+      <div class="af-row"><span class="af-l">말하는 언어</span><span id="newFlags" class="row" style="gap:6px"></span></div>
+      <div class="af-row"><span class="af-l">번역할 언어</span><span id="newTargets" class="row" style="gap:6px"></span></div>
+      <div class="af-row"><span class="af-l"></span><span class="row" style="gap:6px"><button id="addOk" class="primary">추가</button><button id="addCancel">닫기</button></span></div>
+    </div>
+  </section>
+
+  <!-- 추가 번역 · 듣기 -->
+  <section class="card">
+    <div class="row" style="margin-bottom:12px">
+      <span class="lbl">더 번역할 언어</span>
+      <span id="targets" class="row" style="gap:8px"></span>
+      <span class="hint" style="flex-basis:100%">사람마다 정한 번역 말고도, 여기서 고른 언어로 모든 문장을 더 번역합니다.</span>
+    </div>
     <div class="row" style="margin-bottom:12px" id="srcRow">
       <span class="lbl">말하는 언어</span>
       <span id="srcFlags" class="row" style="gap:8px"></span>
@@ -388,41 +438,12 @@
         <option value="es-ES">Español</option>
       </select>
     </div>
-    <div class="row" style="margin-bottom:12px">
-      <span class="lbl">번역할 언어</span>
-      <span id="targets" class="row" style="gap:8px"></span>
-    </div>
-    <div class="row" style="margin-bottom:12px">
-      <span class="lbl">번역 방식</span>
-      <span class="seg" id="engSeg">
-        <button data-e="google">무료 Google</button>
-        <button data-e="gemini">Gemini <small>무료</small></button>
-        <button data-e="claude">Claude <small>유료</small></button>
-      </span>
-      <label id="polishWrap" class="chk" title="앞 문맥을 보고 잘못 알아들은 말을 바로잡습니다. 들은 그대로의 말도 함께 남깁니다."><input type="checkbox" id="polishOn"> ✨ 문장 다듬기</label>
-      <span id="engineNote" class="hint"></span>
-    </div>
-    <div class="row" style="margin-bottom:12px">
-      <span class="lbl">녹음</span>
-      <label class="switch"><input type="checkbox" id="recOn"><span class="track"></span><span>🎙 소리도 함께 녹음</span></label>
-      <span id="recNote" class="hint">듣는 동안 목소리를 녹음해서, 끝난 뒤 ⬇️ 저장 → 녹음 파일로 받습니다.</span>
-    </div>
     <div class="row">
       <button id="startBtn" class="bigbtn">● 듣기 시작</button>
-      <div class="status" id="status" style="flex:1;min-width:240px"></div>
+      <label class="switch"><input type="checkbox" id="recOn"><span class="track"></span><span>🎙 소리도 함께 녹음</span></label>
+        <span id="recNote" class="hint">듣는 동안 목소리를 녹음해서, 끝난 뒤 ⬇️ 저장 → 녹음 파일로 받습니다.</span>
     </div>
-  </section>
-
-  <!-- 말하는 사람 -->
-  <section class="card">
-    <h2 class="ctitle">👥 말하는 사람 <span class="hint" style="font-weight:400">— 미리 등록해 두면 아래 기록 창에 순서대로 나옵니다</span></h2>
-    <div id="roster" class="row" style="gap:8px"></div>
-    <div id="addForm" class="addform" hidden>
-      <input type="text" id="newName" placeholder="이름" style="width:12em">
-      <span id="newFlags" class="row" style="gap:6px"></span>
-      <span class="row" style="gap:6px"><button id="addOk" class="primary">추가</button><button id="addCancel">취소</button></span>
-    </div>
-    <p class="hint" style="margin:10px 0 0">차례가 되면 아래 기록 창에서 그 사람의 <b>🎙 이 사람 말하기</b>를 누르고, 끝나면 <b>⏸ 멈춤</b>을 누르세요. 이름은 끌어서 순서를 바꿀 수 있습니다.</p>
+    <div class="status" id="status" style="margin-top:8px"></div>
   </section>
 
   <!-- 기록 -->
@@ -475,7 +496,7 @@
       <button id="sendGpt" class="sendbtn gp" title="받아 적은 글과 정리·번역 부탁을 ChatGPT 새 대화에 넣어 엽니다">ChatGPT</button>
       <button id="sendTr" class="sendbtn tr" title="원문을 복사하고 다국어 통·번역기를 엽니다">통·번역기</button>
     </span>
-    <label class="hint" style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="withTime" checked style="margin:0"> 시각 포함</label>
+    <label class="hint" style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="withTime" checked style="margin:0"> 시간 표시</label>
     <button id="newBtn" class="newbtn" title="지금 기록은 지난 기록에 보관하고 새 기록을 시작합니다">＋ 새로 시작</button>
   </section>
   </div>
@@ -493,11 +514,24 @@
       <label class="switch"><input type="checkbox" id="cvSpeak"><span class="track"></span><span>🔊 소리 내어 읽기</span></label>
       <span id="cvNote" class="hint" style="flex-basis:100%"></span>
     </div>
+    <div class="row cv-vol" style="margin-top:8px">
+      <span class="cv-vl">🔊 읽는 소리</span>
+      <input type="range" id="cvVol" min="0" max="100" step="5">
+      <span id="cvVolV" class="hint" style="min-width:3em"></span>
+      <button id="cvVolTest" class="cv-small">들어 보기</button>
+    </div>
+    <div class="row cv-vol">
+      <span class="cv-vl">🎤 마이크</span>
+      <span class="cv-meter"><i id="cvMicLvl"></i></span>
+      <button id="cvMicTest" class="cv-small">마이크 확인</button>
+      <span class="hint" style="flex-basis:100%">소리가 작게 잡히면 맥 <b>시스템 설정 → 사운드 → 입력</b>에서 입력 음량을 올리세요. (웹앱은 마이크 크기를 직접 바꿀 수 없습니다)</span>
+    </div>
     </div>
   </section>
 
   <section class="cv-stream" id="cvStream"><div class="cv-empty" id="cvEmpty">아래 입력창에 말하거나 쓰면, 통역된 대화가 여기에 차례로 올라갑니다.</div></section>
 
+  <div class="cv-grip" id="cvHistGrip" title="끌어서 대화 창과 대화 기록 크기 조절"><span></span></div>
   <section class="card cv-hist">
     <div class="cv-hh">
       <button id="cvHistToggle" class="cv-small">▾ 대화 기록</button>
@@ -509,10 +543,8 @@
     </div>
     <div id="cvHistWrap">
       <div id="cvHist"></div>
-      <div class="cv-grip" id="cvHistGrip" title="끌어서 높이 조절"><span></span></div>
     </div>
   </section>
-  <div id="cvSpacer"></div>
 </div>
 
 </main>
@@ -522,6 +554,7 @@
     <button id="cvLayoutBtn" class="cv-small" title="입력칸을 나란히 또는 위아래로">⇆ 나란히</button>
     <span class="hint cv-tip">위 막대·가운데 막대를 끌어서 크기를 바꿉니다</span>
     <span id="cvListen" class="cv-listen"></span>
+    <span class="cv-meter mini" title="마이크 소리 크기"><i id="cvMicLvl2"></i></span>
   </div>
   <div class="cv-panels side" id="cvPanels">
     <div class="cv-panel me" id="cvPanelMe">
@@ -769,6 +802,11 @@ function langButton(cur, onPick, label){
   };
   return b;
 }
+setInterval(() => {
+  if (!want || document.body.classList.contains('mode-conv')) return;
+  const n = $('log').querySelector('.spk .rng.live'); if (!n) return;
+  const i = +n.closest('.spk').dataset.i; if (ses.entries[i]) n.textContent = secRange(i);
+}, 1000);
 function changeSpeakerLang(p, v){
   p.lang = v;
   const ld = lastDivider();
@@ -789,11 +827,12 @@ function renderUpcoming(){
     const go = document.createElement('button'); go.className = 'go'; go.textContent = '🎙 이 사람 말하기'; go.onclick = () => selectSpeaker(p);
     const meta = document.createElement('span'); meta.className = 'meta'; meta.textContent = '차례 기다림 · ';
     meta.append(langButton(p.lang, v => changeSpeakerLang(p, v)));
-    const del = document.createElement('button'); del.className = 'del'; del.textContent = '✕ 지우기'; del.title = '이 순서를 명단에서 뺍니다';
+    if ((p.targets || []).length) meta.insertAdjacentHTML('beforeend', ` <span class="tgt">→ ${tgtFlags(p.targets)}</span>`);
+    const del = document.createElement('button'); del.className = 'del'; del.textContent = '✕ 취소'; del.title = '이 순서를 취소합니다';
     del.onclick = () => {
-      if (!del.classList.contains('sure')){ del.classList.add('sure'); del.textContent = '지우기?'; setTimeout(() => { del.classList.remove('sure'); del.textContent = '✕ 지우기'; }, 3000); return; }
+      if (!del.classList.contains('sure')){ del.classList.add('sure'); del.textContent = '취소?'; setTimeout(() => { del.classList.remove('sure'); del.textContent = '✕ 취소'; }, 3000); return; }
       ses.roster = roster().filter(x => x.id !== p.id); if (ses.active === p.id) ses.active = null;
-      saveNow(); renderRoster(); toast('순서를 지웠습니다.');
+      saveNow(); renderRoster(); toast('순서를 취소했습니다.');
     };
     d.append(nm, go, meta, del);
     makeDraggable(d, p.id);
@@ -834,13 +873,19 @@ function entryEl(e, i){
       extra.push(go);
     }
     const meta = document.createElement('span'); meta.className = 'meta';
-    if (p && lastDiv){ meta.innerHTML = `<span class="hmst">${hms(e.t)} · </span>`; meta.append(langButton(p.lang, v => changeSpeakerLang(p, v))); }
-    else meta.innerHTML = `<span class="hmst">${hms(e.t)} · </span>${flagImg(L(e.src).flag)} ${L(e.src).name}`;
+    const rng = document.createElement('span'); rng.className = 'rng hmst' + (p && lastDiv && ses.active === p.id && want ? ' live' : ''); rng.textContent = secRange(i);
+    meta.append(rng, document.createTextNode(' · '));
+    if (p && lastDiv) meta.append(langButton(p.lang, v => changeSpeakerLang(p, v)));
+    else meta.insertAdjacentHTML('beforeend', `${flagImg(L(e.src).flag)} ${L(e.src).name}`);
+    const tg = (p && p.targets) || e.tgt;
+    if (tg && tg.length) meta.insertAdjacentHTML('beforeend', ` <span class="tgt">→ ${tgtFlags(tg)}</span>`);
+    const cp = document.createElement('button'); cp.className = 'del cp'; cp.textContent = '📋 복사'; cp.title = '이 사람이 한 말과 번역을 복사';
+    cp.onclick = () => copyText(secText(i), `${spkNo(i)}번째 순서를`);
     const db = delBtn(i, '이 순서 표시'); db.textContent = '✕ 지우기'; db.dataset.label = '✕ 지우기';
-    d.append(nm, ...extra, meta, db); return d;
+    d.append(nm, ...extra, meta, cp, db); return d;
   }
   const d = document.createElement('div'); d.className = 'ent'; d.dataset.i = i;
-  const tm = document.createElement('div'); tm.className = 'tm'; tm.textContent = hms(e.t);
+  const tm = document.createElement('div'); tm.className = 'tm'; tm.textContent = relT(i); tm.title = '이 순서를 시작한 뒤 지난 시간 · 시각 ' + hms(e.t);
   const b = document.createElement('div'); b.className = 'body';
   const o = document.createElement('div'); o.className = 'o'; o.textContent = e.text;
   b.append(o);
@@ -851,7 +896,7 @@ function entryEl(e, i){
     const raw = document.createElement('div'); raw.className = 'raw'; raw.textContent = '🎧 들은 그대로: ' + e.raw;
     b.append(raw);
   }
-  const langs = LANGS.map(l => l.code).filter(c => S.targets.includes(c) && (c in (e.tr || {}) || (e.pend || []).includes(c) || (e.fail || []).includes(c)));
+  const langs = LANGS.map(l => l.code).filter(c => (S.targets.includes(c) || (e.tgt || []).includes(c)) && (c in (e.tr || {}) || (e.pend || []).includes(c) || (e.fail || []).includes(c)));
   langs.forEach(c => {
     const t = document.createElement('div');
     const tx = document.createElement('span'); tx.className = 'tx';
@@ -868,8 +913,8 @@ function entryEl(e, i){
   d.append(tm, b, delBtn(i, '이 문장'));
   return d;
 }
-function nearBottom(){ const g = $('log'); return g.scrollHeight - g.scrollTop - g.clientHeight < 80; }
-function scrollEnd(){ const g = $('log'); g.scrollTop = g.scrollHeight; }
+function nearBottom(){ const r = $('interim').getBoundingClientRect(); return r.top < innerHeight + 160; }
+function scrollEnd(){ if (document.body.classList.contains('mode-conv')) return; const r = $('interim').getBoundingClientRect(); if (r.bottom > innerHeight - 20) scrollBy({top: r.bottom - innerHeight + 90, behavior: 'smooth'}); }
 function renderAll(){
   const g = $('log');
   [...g.querySelectorAll(':scope > .ent, :scope > .spk')].forEach(n => n.remove());
@@ -878,7 +923,7 @@ function renderAll(){
   g.insertBefore(frag, $('interim'));
   $('emptyMsg').hidden = ses.entries.length > 0 || roster().length > 0;
   renderUpcoming();
-  scrollEnd(); renderCount(); renderStage(); renderExLang(); renderReadBar(); markReading();
+  renderCount(); renderStage(); renderExLang(); renderReadBar(); markReading();
 }
 function updateEntry(i){
   const stick = nearBottom();
@@ -899,7 +944,7 @@ function renderCount(){
   const words = talk().reduce((a, e) => a + e.text.length, 0);
   $('countInfo').textContent = `${new Date(ses.start).toLocaleDateString('ko-KR')} ${hms(ses.start)} 시작 · ${sp ? sp + '명 · ' : ''}${n}문장 · ${words.toLocaleString()}자`;
 }
-$('log').addEventListener('scroll', () => { if (nearBottom()) $('jumpBtn').hidden = true; });
+addEventListener('scroll', () => { if (nearBottom()) $('jumpBtn').hidden = true; });
 $('jumpBtn').onclick = () => { scrollEnd(); $('jumpBtn').hidden = true; };
 
 /* ---------- 음성 인식 ---------- */
@@ -999,7 +1044,9 @@ function addEntry(raw, at){
   const text = raw.replace(/\s+/g, ' ').trim();
   if (!text) return;
   const sc = srcCode(S.src);
-  const e = {t: at || Date.now(), text, src: sc, tr: {}, pend: activeTargets(sc), fail: [], gq: S.engine === 'gemini' && !!S.gkey};
+  const ld = lastDivider(), who = ld && ld.spk ? roster().find(x => x.id === ld.spk) : null;
+  const tgt = [...new Set([...((who && who.targets) || []), ...S.targets])].filter(c => c !== sc);
+  const e = {t: at || Date.now(), text, src: sc, tgt, tr: {}, pend: tgt.slice(), fail: [], gq: S.engine === 'gemini' && !!S.gkey};
   ses.entries.push(e);
   const i = ses.entries.length - 1;
   updateEntry(i); renderExLang(); saveSoon();
@@ -1161,7 +1208,7 @@ $('dlAudio').onclick = async () => {
 
 /* ---------- 말하는 사람 명단 ---------- */
 const roster = () => (ses.roster = ses.roster || []);
-let editId = null, newSpeech = S.src;
+let editId = null, newSpeech = S.src, newTg = [];
 function speechOf(v){ return SPEECH.find(o => o.v === v) || SPEECH[0]; }
 function renderRoster(){
   const box = $('roster'); box.innerHTML = '';
@@ -1169,15 +1216,15 @@ function renderRoster(){
     const w = document.createElement('span'); w.className = 'pwrap';
     const b = document.createElement('button');
     b.className = 'pchip' + (ses.active === p.id ? ' on' + (want ? '' : ' paused') : '');
-    b.innerHTML = `<span class="no">${k + 1}</span>${flagImg(speechOf(p.lang).flag)} <span></span>`;
-    b.querySelector('span:last-child').textContent = p.name || `${k + 1}번 사람`;
+    b.innerHTML = `<span class="no">${k + 1}</span>${flagImg(speechOf(p.lang).flag)} <span></span>${(p.targets || []).length ? ` <span class="tgt">→ ${tgtFlags(p.targets)}</span>` : ''}`;
+    b.querySelector('span:nth-of-type(2)').textContent = p.name || `${k + 1}번 사람`;
     b.title = '누르면 이름·언어를 고칩니다. 끌어서 순서를 바꿀 수 있습니다. 듣기·멈춤은 아래 기록 창에서 합니다.';
     b.onclick = () => openAdd(p);
     const ed = document.createElement('button'); ed.className = 'mini'; ed.textContent = '✎'; ed.title = '고치기';
     ed.onclick = () => openAdd(p);
-    const del = document.createElement('button'); del.className = 'mini'; del.textContent = '✕'; del.title = '명단에서 빼기';
+    const del = document.createElement('button'); del.className = 'mini'; del.textContent = '✕'; del.title = '이 사람 취소';
     del.onclick = () => {
-      if (!del.classList.contains('sure')){ del.classList.add('sure'); del.textContent = '빼기?'; setTimeout(() => { del.classList.remove('sure'); del.textContent = '✕'; }, 3000); return; }
+      if (!del.classList.contains('sure')){ del.classList.add('sure'); del.textContent = '취소?'; setTimeout(() => { del.classList.remove('sure'); del.textContent = '✕'; }, 3000); return; }
       ses.roster = roster().filter(x => x.id !== p.id); if (ses.active === p.id) ses.active = null;
       saveNow(); renderRoster();
     };
@@ -1197,8 +1244,21 @@ function renderNewFlags(){
   SPEECH.forEach(o => {
     const b = document.createElement('label'); b.className = 'fbtn src' + (newSpeech === o.v ? ' on' : '');
     b.innerHTML = `${flagImg(o.flag)} ${o.name}`;
-    b.onclick = () => { newSpeech = o.v; renderNewFlags(); };
+    b.onclick = () => { newSpeech = o.v; renderNewFlags(); renderNewTargets(); };
     $('newFlags').append(b);
+  });
+}
+function renderNewTargets(){
+  const sc = srcCode(newSpeech);
+  newTg = newTg.filter(c => c !== sc);
+  $('newTargets').innerHTML = '';
+  LANGS.forEach(l => {
+    const b = document.createElement('label'); const same = l.code === sc;
+    b.className = 'fbtn' + (newTg.includes(l.code) ? ' on' : '') + (same ? ' off' : '');
+    b.innerHTML = `${flagImg(l.flag)} ${l.name} <span class="tick">✓</span>`;
+    if (same){ b.title = '말하는 언어와 같습니다'; b.style.opacity = .35; }
+    else b.onclick = () => { newTg = newTg.includes(l.code) ? newTg.filter(c => c !== l.code) : [...newTg, l.code]; newTg = LANGS.map(x => x.code).filter(c => newTg.includes(c)); renderNewTargets(); };
+    $('newTargets').append(b);
   });
 }
 function openAdd(p){
@@ -1206,7 +1266,9 @@ function openAdd(p){
   $('newName').value = p ? p.name : '';
   newSpeech = p ? p.lang : (roster().length ? roster()[roster().length - 1].lang : S.src);
   $('addOk').textContent = p ? '고치기' : '추가';
-  renderNewFlags(); $('addForm').hidden = false; $('newName').focus();
+  const lastP = roster()[roster().length - 1];
+  newTg = p ? (p.targets || []).slice() : (lastP && lastP.targets ? lastP.targets.slice() : S.targets.slice());
+  renderNewFlags(); renderNewTargets(); $('addForm').hidden = false; $('newName').focus();
 }
 $('addCancel').onclick = () => { $('addForm').hidden = true; };
 $('addOk').onclick = () => {
@@ -1214,21 +1276,49 @@ $('addOk').onclick = () => {
   if (editId){
     const p = roster().find(x => x.id === editId);
     if (p){
-      p.name = name; p.lang = newSpeech;
+      p.name = name; p.lang = newSpeech; p.targets = newTg.slice();
       ses.entries.forEach(e => { if (e.div && e.spk === p.id) e.name = name; });
       if (ses.active === p.id && S.src !== p.lang) setSrc(p.lang);
       renderAll();
     }
   } else {
-    roster().push({id: Date.now(), name, lang: newSpeech});
+    roster().push({id: Date.now(), name, lang: newSpeech, targets: newTg.slice()});
     $('newName').value = ''; $('newName').focus();
   }
   saveNow(); renderRoster();
   if (editId){ $('addForm').hidden = true; editId = null; }
-  else toast('명단에 넣었습니다. 계속 추가하거나 "취소"로 닫으세요.');
+  else toast('추가했습니다. 계속 추가하거나 "닫기"를 누르세요.');
 };
-$('newName').onkeydown = e => { if (e.key === 'Enter') $('addOk').click(); if (e.key === 'Escape') $('addCancel').click(); };
+$('newName').onkeydown = e => {
+  if (e.isComposing || e.keyCode === 229) return;   // 한글 입력 중 Enter가 두 번 들어와 두 명 추가되던 문제
+  if (e.key === 'Enter'){ e.preventDefault(); $('addOk').click(); }
+  if (e.key === 'Escape') $('addCancel').click();
+};
 
+function secStart(i){   // i번째 문장이 속한 순서의 시작 시각
+  for (let k = i; k >= 0; k--) if (ses.entries[k].div) return ses.entries[k].t;
+  const first = ses.entries.find(x => !x.div); return first ? first.t : ses.start;
+}
+function secEnd(i){   // 순서(i = 순서 표시)의 끝 시각
+  let end = ses.entries[i].t, k = i + 1;
+  for (; k < ses.entries.length && !ses.entries[k].div; k++) end = ses.entries[k].t;
+  const isLast = k >= ses.entries.length;
+  if (isLast && want && ses.active && ses.active === ses.entries[i].spk) end = Date.now();
+  return end;
+}
+const hm = t => hms(t).slice(0, 5);
+const relT = i => dur(ses.entries[i].t - secStart(i));
+function secRange(i){ const a = ses.entries[i].t, b = secEnd(i); return `${hm(a)} ~ ${hm(b)} · ⏱ ${dur(b - a)}`; }
+function secText(i){   // 한 사람 순서의 원문+번역
+  const tm = $('withTime').checked, langs = usedLangs();
+  const e0 = ses.entries[i], out = [`=== ${spkTitle(i)} (${secRange(i)}) ===`];
+  for (let k = i + 1; k < ses.entries.length && !ses.entries[k].div; k++){
+    const e = ses.entries[k], pre = tm ? `[${relT(k)}] ` : '';
+    out.push(pre + e.text + langs.filter(c => e.tr[c] != null).map(c => `\n${tm ? ' '.repeat(pre.length) : ''}${L(c).tag}: ${e.tr[c]}`).join(''));
+  }
+  return out.join('\n\n');
+}
+const tgtFlags = list => (list || []).map(c => flagImg(L(c).flag)).join('');
 function lastDivider(){ for (let k = ses.entries.length - 1; k >= 0; k--) if (ses.entries[k].div) return ses.entries[k]; return null; }
 function selectSpeaker(p){
   if (ses.active === p.id){
@@ -1350,7 +1440,8 @@ Rules:
 - A segment may be an incomplete sentence; translate it as a natural fragment that continues the previous context.
 - Keep names, numbers, dates and technical terms accurate and consistent.
 Return ONLY a JSON object with exactly these keys: ${langs.map(c => `"${c}"`).join(', ')}. Each value is the translation string. No other text.`;
-  return `You are a live interpreter at a Korean-Canadian church in Montreal. You receive one short segment of a long spoken talk (a testimony, sermon or Bible lecture) as captured by speech recognition, in ${L(sc).en}.
+  const sermon = meta().kind === 'sermon';
+  return `You are a live interpreter at a Korean-Canadian church in Montreal. You receive one short segment of a long spoken ${sermon ? 'sermon or Bible lecture by the pastor. Use a reverent preaching register; keep scripture references in the standard form of each language (e.g. John 3:16, Jean 3.16, 요한복음 3:16) and keep theological terms consistent throughout' : 'talk (a testimony or sharing)'} as captured by speech recognition, in ${L(sc).en}.
 Translate the segment into: ${langs.map(c => L(c).en).join(', ')}.
 Rules:
 - Speech recognition makes mistakes and has no punctuation. Silently fix obvious mis-hearings using context (especially Bible names, books, places and church words) and translate what the speaker meant.
@@ -1455,7 +1546,7 @@ async function claudeTranslate(e, sc, langs){
 /* 여러 문장을 앞뒤 문맥과 함께 다듬고 번역 */
 async function polishChunk(items, before, after, eng, doPolish = true){
   const sc = items[0].src || srcCode(ses.src || S.src);
-  const langs = S.targets.filter(c => c !== sc);
+  const langs = [...new Set([...S.targets, ...items.flatMap(x => x.tgt || [])])].filter(c => c !== sc);
   const fixRule = doPolish ? POLISH_RULE(sc) : `"fixed": the segment exactly as given`;
   const sys = systemPrompt(sc, langs).split('\nReturn ONLY')[0] + `
 You now receive several consecutive segments as a JSON array, with context before and after.
@@ -1595,7 +1686,7 @@ function markReading(){
   document.querySelectorAll('.ent.reading').forEach(n => n.classList.remove('reading'));
   if (!RD.on) return;
   const n = $('log').querySelector(`.ent[data-i="${RD.i}"]`);
-  if (n){ n.classList.add('reading'); const g = $('log'); g.scrollTop = n.offsetTop - g.clientHeight / 3; }
+  if (n){ n.classList.add('reading'); n.scrollIntoView({block: 'center', behavior: 'smooth'}); }
 }
 function speakCur(){
   if (!RD.on || RD.paused) return;
@@ -1605,7 +1696,7 @@ function speakCur(){
   const r = readText(ses.entries[k]);
   const u = new SpeechSynthesisUtterance(r.text);
   u.lang = r.tag; const v = voiceFor(r.tag); if (v) u.voice = v;
-  u.rate = +$('readRate').value || 1;
+  u.rate = +$('readRate').value || 1; u.volume = S.vol;
   const my = u;
   u.onend = () => { if (RD.cur === my && RD.on && !RD.paused){ RD.i++; speakCur(); } };
   u.onerror = () => { if (RD.cur === my && RD.on && !RD.paused){ RD.i++; setTimeout(speakCur, 200); } };
@@ -1682,8 +1773,8 @@ $('stDown').onclick = () => { S.stage = Math.max(2, +(S.stage - .4).toFixed(1));
 function lines(kind, c){
   const tm = $('withTime').checked, all = usedLangs();
   return ses.entries.map((e, i) => {
-    if (e.div) return `\n=== ${spkTitle(i)} ===`;
-    const p = tm ? `[${hms(e.t)}] ` : '';
+    if (e.div) return `\n=== ${spkTitle(i)}${tm ? ` (${secRange(i)})` : ''} ===`;
+    const p = tm ? `[${relT(i)}] ` : '';
     const tr = c && e.tr[c] != null ? e.tr[c] : '';
     if (kind === 'orig') return p + e.text;
     if (kind === 'tr') return tr ? p + tr : '';
@@ -1752,8 +1843,8 @@ $('dlTxt').onclick = () => {
   const tm = $('withTime').checked;
   const langs = LANGS.map(l => l.code).filter(c => talk().some(e => e.tr[c] != null));
   const body = ses.entries.map((e, i) => {
-    if (e.div) return `\n=== ${spkTitle(i)}${tm ? ` (${hms(e.t)})` : ''} ===`;
-    const p = tm ? `[${hms(e.t)}] ` : '';
+    if (e.div) return `\n=== ${spkTitle(i)}${tm ? ` (${secRange(i)})` : ''} ===`;
+    const p = tm ? `[${relT(i)}] ` : '';
     return p + e.text + (e.pol ? ` ✨\n  (들은 그대로: ${e.raw})` : '') + langs.filter(c => e.tr[c] != null).map(c => `\n  ${L(c).tag}: ${e.tr[c]}`).join('');
   }).join('\n\n');
   download(fileBase() + '.txt', new Blob(['﻿' + header() + '\n\n' + body + '\n'], {type: 'text/plain;charset=utf-8'}));
@@ -1762,8 +1853,8 @@ $('dlTxt').onclick = () => {
 function rowsForExport(){
   const out = []; let who = '', no = 0, lang = '';
   ses.entries.forEach((e, i) => {
-    if (e.div){ no = spkNo(i); who = e.name || ''; lang = e.src; out.push({div: true, title: spkTitle(i), t: e.t, src: e.src}); return; }
-    out.push({no, who, t: e.t, src: e.src || srcCode(ses.src || S.src), text: e.text, raw: e.pol ? e.raw : '', tr: e.tr || {}});
+    if (e.div){ no = spkNo(i); who = e.name || ''; lang = e.src; out.push({div: true, title: spkTitle(i), t: e.t, src: e.src, range: secRange(i)}); return; }
+    out.push({no, who, t: e.t, rel: relT(i), src: e.src || srcCode(ses.src || S.src), text: e.text, raw: e.pol ? e.raw : '', tr: e.tr || {}});
   });
   return out;
 }
@@ -1786,11 +1877,11 @@ $('dlXlsx').onclick = async () => {
   try{ await loadXlsx(); }catch(e){ return toast('Excel 도구를 불러오지 못했습니다. 다시 눌러 주세요.'); }
   const m = meta(), langs = usedLangs();
   const tm = $('withTime').checked;
-  const head = ['순서', '말한 사람', ...(tm ? ['시각'] : []), '원문 언어', '원문', '다듬음', '들은 그대로 (다듬기 전)', ...langs.map(c => L(c).name + ' 번역')];
+  const head = ['순서', '말한 사람', ...(tm ? ['시간 (순서 시작 뒤)'] : []), '원문 언어', '원문', '다듬음', '들은 그대로 (다듬기 전)', ...langs.map(c => L(c).name + ' 번역')];
   const data = [head];
   rowsForExport().forEach(r => {
     if (r.div) return;
-    data.push([r.no || '', r.who, ...(tm ? [hms(r.t)] : []), L(r.src).name, r.text, r.raw ? '✨' : '', r.raw, ...langs.map(c => r.tr[c] != null ? r.tr[c] : '')]);
+    data.push([r.no || '', r.who, ...(tm ? [r.rel] : []), L(r.src).name, r.text, r.raw ? '✨' : '', r.raw, ...langs.map(c => r.tr[c] != null ? r.tr[c] : '')]);
   });
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws['!cols'] = [{wch: 6}, {wch: 14}, ...(tm ? [{wch: 10}] : []), {wch: 10}, {wch: 60}, {wch: 7}, {wch: 40}, ...langs.map(() => ({wch: 60}))];
@@ -1816,8 +1907,8 @@ function pdfHtml(){
   const [h1, ...rest] = header().split('\n');
   let body = `<h1>${esc(h1)}</h1>${rest.map(l => `<p class="info">${esc(l)}</p>`).join('')}`;
   rowsForExport().forEach(r => {
-    if (r.div){ body += `<h2>${esc(r.title)} <small>${tm ? hms(r.t) + ' · ' : ''}${esc(L(r.src).name)}</small></h2>`; return; }
-    body += `<div class="e">${tm ? `<span class="tm">${hms(r.t)}</span>` : ''}<div class="o">${esc(r.text)}${r.raw ? ' <span class="pm">✨ 다듬음</span>' : ''}</div>${r.raw ? `<div class="rw">들은 그대로: ${esc(r.raw)}</div>` : ''}` +
+    if (r.div){ body += `<h2>${esc(r.title)} <small>${tm ? r.range + ' · ' : ''}${esc(L(r.src).name)}</small></h2>`; return; }
+    body += `<div class="e">${tm ? `<span class="tm">${r.rel}</span>` : ''}<div class="o">${esc(r.text)}${r.raw ? ' <span class="pm">✨ 다듬음</span>' : ''}</div>${r.raw ? `<div class="rw">들은 그대로: ${esc(r.raw)}</div>` : ''}` +
       langs.filter(c => r.tr[c] != null).map(c => `<div class="t"><b>${L(c).tag}</b> ${esc(r.tr[c])}</div>`).join('') + '</div>';
   });
   const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>${esc(fileBase())}</title><style>
@@ -1868,9 +1959,9 @@ $('dlDocx').onclick = async () => {
   const langs = LANGS.map(l => l.code).filter(c => talk().some(e => e.tr[c] != null));
   const kids = header().split('\n').map((ln, k) => new Paragraph({spacing: {after: k ? 240 : 60}, children: [new TextRun({text: ln, bold: !k, size: k ? 20 : 28, color: k ? '666666' : undefined})]}));
   ses.entries.forEach((e, i) => {
-    if (e.div){ kids.push(new Paragraph({spacing: {before: 320, after: 160}, children: [new TextRun({text: `${spkTitle(i)}${tm ? `  (${hms(e.t)})` : ''}`, bold: true, size: 26, color: '1E4D8C'})]})); return; }
+    if (e.div){ kids.push(new Paragraph({spacing: {before: 320, after: 160}, children: [new TextRun({text: `${spkTitle(i)}${tm ? `  (${secRange(i)})` : ''}`, bold: true, size: 26, color: '1E4D8C'})]})); return; }
     kids.push(new Paragraph({spacing: {after: 40}, children: [
-      ...(tm ? [new TextRun({text: hms(e.t) + '  ', color: '999999', size: 18})] : []),
+      ...(tm ? [new TextRun({text: relT(i) + '  ', color: '999999', size: 18})] : []),
       new TextRun({text: e.text}), ...(e.pol ? [new TextRun({text: '  ✨다듬음', color: '9A6B12', size: 16})] : [])
     ]}));
     if (e.pol) kids.push(new Paragraph({indent: {left: 360}, spacing: {after: 30}, children: [new TextRun({text: '들은 그대로: ' + e.raw, color: '888888', size: 18})]}));
@@ -1902,14 +1993,14 @@ function chatPrompt(){
     .map(c => `${({ko:'한국어', en:'영어', fr:'프랑스어', zh:'중국어', es:'스페인어'})[c]}: ${L(c).bible}`).join(', ');
   const m = meta();
   const info = [m.title && `모임: ${m.title}`, `날짜: ${dateLabel(m.date)}${timeRange(m) ? ' ' + timeRange(m) : ''}`, m.place && `장소: ${m.place}`, m.who && `대상: ${m.who}`].filter(Boolean).join(' / ');
-  const church = m.kind !== 'general';
-  return `아래는 ${church ? '교회에서 한' : '모임에서 한'} ${srcs.map(c => K[c]).join('·')} ${church ? '간증(또는 설교)' : '말(강연·발표·대화 등)'}을 음성 인식으로 받아 적은 원문입니다. ${talk().length}문장.
+  const church = m.kind !== 'general', sermon = m.kind === 'sermon';
+  return `아래는 ${church ? '교회에서 한' : '모임에서 한'} ${srcs.map(c => K[c]).join('·')} ${sermon ? '설교(성경강연)' : church ? '간증·나눔' : '말(강연·발표·대화 등)'}을 음성 인식으로 받아 적은 원문입니다. ${talk().length}문장.
 ${info}
 정리한 결과 맨 위에 위 모임 정보를 제목처럼 넣어 주세요.${sp > 1 ? `
 여러 사람(${sp}명)이 차례로 말했고, "=== N번째 순서 · 이름 ===" 줄로 사람이 나뉩니다. 사람마다 따로 나누어 정리하고 번역해 주세요.` : ''}
 
 부탁드립니다:
-1. 음성 인식 때문에 잘못 적힌 말(특히 ${church ? '성경 인물·책 이름, 교회 용어' : '사람·장소 이름, 전문 용어'})을 문맥에 맞게 고치고, 문장 부호를 넣고, 내용 흐름에 따라 문단을 나누어 "정리된 원문"을 보여 주세요. 말한 내용은 빼거나 보태지 마세요.
+1. 음성 인식 때문에 잘못 적힌 말(특히 ${church ? '성경 인물·책 이름, 교회 용어' : '사람·장소 이름, 전문 용어'})을 문맥에 맞게 고치고, 문장 부호를 넣고, 내용 흐름에 따라 문단을 나누어 "정리된 원문"을 보여 주세요.${sermon ? ' 설교 원고처럼 본문 말씀, 서론, 대지(소제목), 결론이 드러나게 소제목을 달아 주고, 인용한 성경 구절은 장절과 함께 표시해 주세요.' : ''} 말한 내용은 빼거나 보태지 마세요.
 2. 정리된 원문을 ${names.join(', ')}로 번역해 주세요(원문과 같은 언어는 빼 주세요). 언어마다 제목을 달아 따로 보여 주세요.
 - 말하는 사람의 말투와 감정이 살아 있는 자연스러운 번역으로 해 주세요.${church ? `
 - 성경 구절을 인용하거나 언급하면 이 번역본의 표현을 따라 주세요: ${bibles}.` : `
@@ -2116,7 +2207,7 @@ document.body.classList.toggle('no-time', !$('withTime').checked);
 $('withTime').onchange = () => {
   store.set('lv-withTime', $('withTime').checked);
   document.body.classList.toggle('no-time', !$('withTime').checked);
-  toast($('withTime').checked ? '시각을 보여 줍니다. 복사·저장에도 들어갑니다.' : '시각을 숨겼습니다. 복사·저장에서도 빠집니다.');
+  toast($('withTime').checked ? '시간을 보여 줍니다. 순서마다 시작~끝 시각과 말한 시간, 문장마다 시작한 뒤 지난 시간입니다.' : '시간을 숨겼습니다. 복사·저장에서도 빠집니다.');
 };
 fillMeta(); renderRoster();
 applyFs(); applyView(); renderTargets(); renderEngine(); renderTotal(); renderAll(); renderStatus();
@@ -2150,11 +2241,48 @@ const CV = {
   layout: store.get('cv-layout', innerWidth < 700 ? 'stack' : 'side'),
   ratio: store.get('cv-ratio', 0.5),
   boxH: store.get('cv-boxH2', innerWidth < 700 ? 300 : 210),
-  histH: store.get('cv-histH', 260),
-  histOpen: store.get('cv-histOpen', true),
+  histH: store.get('cv-histH', 120),
+  histOpen: store.get('cv-histOpen', innerWidth >= 700),
   turns: store.get('cv-turns', []),
 };
-const STREAM_N = 10;   // 위 창에 보여 줄 최근 대화 수
+const STREAM_N = 40;
+S.vol = store.get('lv-vol', 1);
+function cvVolUI(){ $('cvVol').value = Math.round(S.vol * 100); $('cvVolV').textContent = Math.round(S.vol * 100) + '%'; }
+$('cvVol').oninput = () => { S.vol = +$('cvVol').value / 100; store.set('lv-vol', S.vol); cvVolUI(); };
+$('cvVolTest').onclick = () => {
+  const l = cvL(partner()); const u = new SpeechSynthesisUtterance({en: 'Hello, nice to meet you.', fr: 'Bonjour, enchanté.', zh: '你好，很高兴认识你。', es: 'Hola, mucho gusto.', ja: 'こんにちは、はじめまして。'}[l.c] || 'Hello');
+  u.lang = l.tts; const v = voiceFor(l.tts); if (v) u.voice = v; u.volume = S.vol; speechSynthesis.cancel(); speechSynthesis.speak(u);
+};
+cvVolUI();
+/* 마이크 소리 크기 막대 */
+let micMeter = null;
+async function micMeterStart(ms){
+  if (micMeter){ if (ms){ clearTimeout(micMeter.timer); micMeter.timer = setTimeout(micMeterStop, ms); } return; }
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    const an = ac.createAnalyser(); an.fftSize = 512; ac.createMediaStreamSource(stream).connect(an);
+    const buf = new Uint8Array(an.fftSize);
+    micMeter = {stream, ac, raf: 0, timer: ms ? setTimeout(micMeterStop, ms) : 0};
+    document.querySelectorAll('.cv-meter.mini').forEach(m => m.classList.add('on'));
+    const tick = () => {
+      if (!micMeter) return;
+      an.getByteTimeDomainData(buf); let pk = 0; for (const v of buf) pk = Math.max(pk, Math.abs(v - 128));
+      const w = Math.min(100, Math.round(pk / 128 * 160)) + '%';
+      $('cvMicLvl').style.width = w; $('cvMicLvl2').style.width = w;
+      micMeter.raf = requestAnimationFrame(tick);
+    };
+    tick();
+  }catch(e){ toast('마이크를 열지 못했습니다. 마이크 허용을 확인해 주세요.'); }
+}
+function micMeterStop(){
+  if (!micMeter) return;
+  cancelAnimationFrame(micMeter.raf); clearTimeout(micMeter.timer);
+  try{ micMeter.stream.getTracks().forEach(t => t.stop()); micMeter.ac.close(); }catch(e){}
+  micMeter = null; $('cvMicLvl').style.width = '0'; $('cvMicLvl2').style.width = '0';
+  document.querySelectorAll('.cv-meter.mini').forEach(m => m.classList.remove('on'));
+}
+$('cvMicTest').onclick = () => { if (micMeter && !cvSide) micMeterStop(); else micMeterStart(8000); toast('말해 보세요. 막대가 움직이면 마이크가 잘 듣고 있는 것입니다.'); };   // 위 창에 보여 줄 최근 대화 수
 const cvSave = () => { if (!store.set('cv-turns', CV.turns)){ CV.turns.splice(0, Math.ceil(CV.turns.length / 4)); store.set('cv-turns', CV.turns); } };
 const partner = () => CV.partner === 'auto' ? CV.detected : CV.partner;
 const cvTA = side => $(side === 'me' ? 'cvMeText' : 'cvThemText');
@@ -2178,12 +2306,14 @@ $('modeSeg').onclick = ev => { const b = ev.target.closest('button'); if (b) set
 /* --- 화면 높이 맞추기: 입력창은 아래 고정, 대화 창은 그 위를 채움 --- */
 function cvFit(){
   if (!document.body.classList.contains('mode-conv')) return;
-  const dockH = $('cvDock').offsetHeight;
-  $('cvSpacer').style.height = dockH + 'px';
+  scrollTo(0, 0);
+  const head = document.querySelector('header'), hb = head.offsetParent ? head.getBoundingClientRect().bottom : 0;
   const vh = window.visualViewport ? visualViewport.height : innerHeight;
-  const top = $('cvStream').getBoundingClientRect().top + window.scrollY;
-  const h = Math.max(180, Math.round(vh - dockH - top - 8));
-  $('cvStream').style.setProperty('--sh', h + 'px');
+  const dockH = $('cvDock').offsetHeight;
+  const mode = $('convMode');
+  mode.style.setProperty('--cvTop', Math.max(0, hb) + 'px');
+  mode.style.setProperty('--cvBot', Math.max(0, innerHeight - vh + dockH) + 'px');
+
 }
 addEventListener('resize', () => { cvFit(); cvRenderStream(); });
 if (window.visualViewport) visualViewport.addEventListener('resize', cvFit);
@@ -2265,12 +2395,14 @@ $('cvSpeak').onchange = () => { CV.speak = $('cvSpeak').checked; store.set('cv-s
 
 /* --- 배치와 크기 --- */
 function cvApplyLayout(){
+  requestAnimationFrame(() => { const st = $('cvStream'); st.scrollTop = st.scrollHeight; });
   const pn = $('cvPanels');
   pn.classList.toggle('side', CV.layout === 'side'); pn.classList.toggle('stack', CV.layout === 'stack');
   pn.style.setProperty('--r1', `${CV.ratio}fr`); pn.style.setProperty('--r2', `${1 - CV.ratio}fr`);
   pn.style.setProperty('--cvh', `${CV.boxH}px`);
   $('cvHist').style.setProperty('--hh', `${CV.histH}px`);
-  $('cvHistWrap').hidden = !CV.histOpen;
+  $('cvHistWrap').hidden = !CV.histOpen; document.querySelector('.cv-hist').classList.toggle('closed', !CV.histOpen);
+  document.querySelector('.cv-hist').style.setProperty('--hh', `${CV.histH}px`);
   $('cvHistToggle').textContent = (CV.histOpen ? '▾' : '▸') + ' 대화 기록';
   cvFit();
 }
@@ -2296,9 +2428,10 @@ dragger($('cvDockGrip'), e => {   // 입력창 위 막대를 위아래로 끌어
   const vh = window.visualViewport ? visualViewport.height : innerHeight;
   CV.boxH = Math.min(vh * .75, Math.max(130, r.bottom - e.clientY - 40)); cvApplyLayout();
 }, () => store.set('cv-boxH2', CV.boxH));
-dragger($('cvHistGrip'), e => {
-  const r = $('cvHist').getBoundingClientRect();
-  CV.histH = Math.min(innerHeight * 1.5, Math.max(80, e.clientY - r.top)); cvApplyLayout();
+dragger($('cvHistGrip'), e => {   // 위로 끌면 기록 칸이 커지고 대화 창이 작아짐
+  if (!CV.histOpen){ CV.histOpen = true; store.set('cv-histOpen', true); }
+  const bottom = $('convMode').getBoundingClientRect().bottom - 14;
+  CV.histH = Math.max(50, bottom - e.clientY - 50); cvApplyLayout();
 }, () => store.set('cv-histH', CV.histH));
 $('cvHistToggle').onclick = () => { CV.histOpen = !CV.histOpen; store.set('cv-histOpen', CV.histOpen); cvApplyLayout(); };
 
@@ -2354,12 +2487,12 @@ function cvStartMic(side){
   cvStopSpeak(true);
   if (cvSide) cvStopMic(true);
   cvSide = side; cvBase = cvTA(side).value.trim();
-  cvFocusOn(); cvOpenRec(); cvMicUI();
+  cvFocusOn(); cvOpenRec(); cvMicUI(); micMeterStart();
 }
 function cvStopMic(submit){
   const side = cvSide;
   cvSide = null; cvTTSPause = false;
-  cvCloseRec();
+  cvCloseRec(); micMeterStop();
   if (submit && side && cvTA(side).value.trim()) cvSubmit(side);
   cvBase = ''; cvMicUI(); cvFocusOff();
 }
@@ -2455,7 +2588,7 @@ function cvSpeakTurn(turn){
   if (cvSide){ cvTTSPause = true; cvCloseRec(); }   // 읽는 소리가 다시 받아 적히지 않게
   const l = cvL(turn.trLang);
   const u = new SpeechSynthesisUtterance(turn.tr);
-  u.lang = l.tts; const v = voiceFor(l.tts); if (v) u.voice = v;
+  u.lang = l.tts; const v = voiceFor(l.tts); if (v) u.voice = v; u.volume = S.vol;
   u.onend = u.onerror = () => { if (cvSpeaking === turn.id) cvStopSpeak(); };
   cvSpeaking = turn.id; cvSayUI(); cvMicUI();
   speechSynthesis.speak(u);
@@ -2537,6 +2670,7 @@ function cvRenderAll(){
   if (stick) hist.scrollTop = hist.scrollHeight;
   $('cvHistCount').textContent = CV.turns.length ? `${CV.turns.length}개` : '';
   cvSayUI(); cvFit();
+  requestAnimationFrame(() => { const st = $('cvStream'); st.scrollTop = st.scrollHeight; });
 }
 $('cvCopy').onclick = () => {
   const tm = $('withTime').checked;
