@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>실시간 통역</title>
+<link rel="icon" id="favLink" type="image/png" href="icons/live-192.png">
 <link rel="manifest" id="mfLink" href="manifest-live.json">
 <link rel="apple-touch-icon" id="atiLink" href="icons/live-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,14 +16,13 @@
   function applyShortcutLook(conv){
     document.getElementById('mfLink').href = conv ? 'manifest-conv.json' : 'manifest-live.json';
     document.getElementById('atiLink').href = conv ? 'icons/conv-180.png' : 'icons/live-180.png';
-    document.getElementById('favLink').href = conv ? 'icons/conv-192.png' : 'icons/live-192.png';
+    const fav = document.getElementById('favLink'); if (fav) fav.href = conv ? 'icons/conv-192.png' : 'icons/live-192.png';
     document.getElementById('atTitle').content = conv ? '대화 통역' : '실시간 통역';
     document.getElementById('themeMeta').content = conv ? '#c26a06' : '#1e4d8c';
     document.title = conv ? '대화 통역' : '실시간 통역';
   }
   applyShortcutLook(location.hash === '#conv');
 </script>
-<link rel="icon" id="favLink" type="image/png" href="icons/live-192.png">
 <style>
   :root{
     --bg:#f3f1ec; --card:#fffdf8; --ink:#1d2733; --muted:#6b7280; --line:#e4ded2;
@@ -209,7 +209,7 @@
   body.mode-conv #liveMode, body.mode-conv #jumpBtn{display:none !important}
   body.mode-conv #fsDown, body.mode-conv #fsUp{display:none}
   body.mode-live #convMode{display:none !important}
-  body.cv-focus:not(.show-head) header, body.cv-focus:not(.show-head) #cvTop{display:none}
+  body.cv-focus:not(.show-top) #cvTopBody{display:none !important}
   .menubtn{position:fixed;bottom:18px;right:16px;z-index:40;width:44px;height:44px;border-radius:12px;background:var(--accent);color:#fff;border:none;font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,.2)}
   /* ===== 대화 모드 ===== */
   body.mode-live .cv-dock{display:none !important}
@@ -2191,22 +2191,22 @@ if (window.visualViewport) visualViewport.addEventListener('resize', cvFit);
 /* --- 위쪽 메뉴 숨기기 (입력하는 동안) --- */
 function cvFocusOn(){
   if (document.body.classList.contains('cv-focus')) return;
-  document.body.classList.add('cv-focus'); $('menuBtn').hidden = false; $('menuBtn').textContent = '☰';
-  scrollTo(0, 0); cvFit();
+  document.body.classList.add('cv-focus');
+  scrollTo(0, 0); cvRenderTop(); cvFit();
 }
 function cvFocusOff(){
   setTimeout(() => {
     const a = document.activeElement;
-    if (cvSide || (a && a.closest && a.closest('.cv-dock'))) return;
+    if (cvSide || (a && a.closest && a.closest('.cv-dock, #cvTop'))) return;
     if (!document.body.classList.contains('cv-focus')) return;
-    document.body.classList.remove('cv-focus', 'show-head'); $('menuBtn').hidden = true; cvFit();
+    document.body.classList.remove('cv-focus', 'show-top'); cvRenderTop(); cvFit();
   }, 150);
 }
-['cvMeText', 'cvThemText'].forEach(id => { $(id).addEventListener('focus', cvFocusOn); $(id).addEventListener('blur', cvFocusOff); });
+['cvMeText', 'cvThemText'].forEach(id => { $(id).addEventListener('focus', () => { if (document.body.classList.contains('show-top')){ document.body.classList.remove('show-top'); cvRenderTop(); } cvFocusOn(); }); $(id).addEventListener('blur', cvFocusOff); });
 document.addEventListener('pointerdown', ev => {
   if (!document.body.classList.contains('cv-focus') || cvSide) return;
   if (ev.target.closest('.cv-dock, #menuBtn, header, #cvTop')) return;
-  document.body.classList.remove('cv-focus', 'show-head'); $('menuBtn').hidden = true; cvFit();
+  document.body.classList.remove('cv-focus', 'show-top'); cvRenderTop(); cvFit();
 });
 $('menuBtn').onclick = () => {
   document.body.classList.toggle('show-head');
@@ -2233,14 +2233,19 @@ function cvLangChanged(){
   if (cvSide === 'them'){ cvCloseRec(); cvOpenRec(); }   // 듣는 중이면 새 언어로 다시 듣기
 }
 CV.topOpen = store.get('cv-topOpen', true);
-$('cvTopToggle').onclick = () => { CV.topOpen = !CV.topOpen; store.set('cv-topOpen', CV.topOpen); cvRenderTop(); };
+const cvTopShown = () => document.body.classList.contains('cv-focus') ? document.body.classList.contains('show-top') : CV.topOpen;
+$('cvTopToggle').onclick = () => {
+  if (document.body.classList.contains('cv-focus')) document.body.classList.toggle('show-top');   // 입력 중에는 잠깐만 열기
+  else { CV.topOpen = !CV.topOpen; store.set('cv-topOpen', CV.topOpen); }
+  cvRenderTop();
+};
 function cvRenderTop(){
   cvRenderLangs();
   const pl = cvL(partner());
   $('cvTopBody').hidden = !CV.topOpen;
   $('cvTopToggle').innerHTML = `🌐 상대 언어: ${flagImg(pl.flag)} ${pl.name}${CV.partner === 'auto' ? ' (자동)' : ''}`
     + ` <span class="hint" style="font-weight:400">· ${CV.claude ? 'Claude 번역' : '무료 번역'} · 🔊 ${CV.speak ? '읽기 켬' : '읽기 끔'}</span>`
-    + `<span class="arr">${CV.topOpen ? '▴ 닫기' : '▾ 열기'}</span>`;
+    + `<span class="arr">${cvTopShown() ? '▴ 닫기' : '▾ 열기'}</span>`;
   const p = cvL(partner());
   $('cvMeLabel').innerHTML = `${flagImg('kr')} 한국어 <span class="hint" style="font-weight:400">→ ${p.name}</span>`;
   $('cvThemLabel').innerHTML = `${flagImg(p.flag)} ${p.name}${CV.partner === 'auto' ? ' <span class="hint" style="font-weight:400">(자동)</span>' : ''} <span class="hint" style="font-weight:400">→ 한국어</span>`;
